@@ -15,7 +15,6 @@ export default function CreditoClientePage() {
   const [clients, setClients] = useState<Client[]>([])
   const [transactions, setTransactions] = useState<ClientTransaction[]>([])
   const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState("")
   const [autoSearch, setAutoSearch] = useState("")
   const [showAutoDropdown, setShowAutoDropdown] = useState(false)
   const [selectedClient, setSelectedClient] = useState<Client | null>(null)
@@ -38,13 +37,20 @@ export default function CreditoClientePage() {
 
   useEffect(() => { load() }, [])
 
-  const filtered = clients
-    .filter(c => c.credit_amount > 0)
-    .filter(c => normalizeSearchText(c.name).includes(normalizeSearchText(search)))
-
   const onlyDigits = (s: string) => s.replace(/\D/g, "")
   const autoNorm = normalizeSearchText(autoSearch)
   const autoDigits = onlyDigits(autoSearch)
+
+  const filtered = clients
+    .filter(c => c.credit_amount > 0)
+    .filter(c => {
+      if (!autoNorm) return true
+      const matchName = normalizeSearchText(c.name).includes(autoNorm)
+      const matchPhone = autoDigits.length >= 4 && onlyDigits(c.phone || "").includes(autoDigits)
+      const matchCpf = autoDigits.length >= 3 && c.cpf && onlyDigits(c.cpf).includes(autoDigits)
+      const matchEmail = c.email && normalizeSearchText(c.email).includes(autoNorm)
+      return matchName || matchPhone || matchCpf || matchEmail
+    })
 
   const autocompleteResults = clients.filter(c => {
     if (!autoNorm) return false
@@ -104,7 +110,17 @@ export default function CreditoClientePage() {
 
       {/* Adicionar Crédito (Autocomplete) */}
       <div style={{ background: '#fff', borderRadius: '1rem', padding: '1.25rem', border: '1px solid #e5e7eb', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
-        <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#1e1e2d', fontFamily: "var(--font-heading)", marginBottom: '1rem' }}>Adicionar Crédito</h3>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '1rem' }}>
+          <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#1e1e2d', fontFamily: "var(--font-heading)", margin: 0 }}>Adicionar Crédito</h3>
+          <ExportButtons 
+            data={exportConfig.data}
+            columns={exportConfig.columns}
+            fileName={exportConfig.fileName}
+            title={exportConfig.title}
+            exportPermissionKey="clients.credit.export"
+            moduleName="credito"
+          />
+        </div>
         <div style={{ position: 'relative', flex: 1, zIndex: 20 }}>
           <Search style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', width: '1.25rem', height: '1.25rem', color: '#9ca3af' }} />
           <input type="text" value={autoSearch} onChange={e => { setAutoSearch(e.target.value); setShowAutoDropdown(true) }}
@@ -145,22 +161,6 @@ export default function CreditoClientePage() {
             </div>
           )}
         </div>
-      </div>
-
-      {/* Filters para a Lista */}
-      <div style={{ background: '#fff', borderRadius: '1rem', padding: '1rem', border: '1px solid #e5e7eb', display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-        <div style={{ position: 'relative', flex: 1, minWidth: '250px' }}>
-          <Search style={{ position: 'absolute', left: '0.875rem', top: '50%', transform: 'translateY(-50%)', width: '1rem', height: '1rem', color: '#9ca3af' }} />
-          <input type="text" value={search} onChange={e => setSearch(e.target.value)}
-            style={{ width: '100%', padding: '0.75rem 1rem 0.75rem 2.5rem', borderRadius: '0.75rem', border: '2px solid #e2e8f0', fontSize: '0.875rem', outline: 'none' }}
-            placeholder="Filtrar clientes na lista abaixo..." />
-        </div>
-        <ExportButtons 
-          data={exportConfig.data}
-          columns={exportConfig.columns}
-          fileName={exportConfig.fileName}
-          title={exportConfig.title}
-        />
       </div>
 
       {/* List */}

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { createPortal } from "react-dom"
 import { X, ZoomIn } from "lucide-react"
 
 interface ExpandableImageProps extends React.ImgHTMLAttributes<HTMLImageElement> {
@@ -68,7 +69,7 @@ export function ExpandableImage({ src, alt, style, className, disablePreview, ..
         )}
       </div>
 
-      {open && (
+      {open && typeof document !== 'undefined' && createPortal(
         <div
           onClick={(e) => {
             e.stopPropagation()
@@ -81,7 +82,7 @@ export function ExpandableImage({ src, alt, style, className, disablePreview, ..
             right: 0,
             bottom: 0,
             backgroundColor: 'rgba(0, 0, 0, 0.85)',
-            zIndex: 999999, // Ensure it's above sidebars and other modals
+            zIndex: 999999,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -119,9 +120,10 @@ export function ExpandableImage({ src, alt, style, className, disablePreview, ..
               borderRadius: '0.5rem',
               boxShadow: '0 10px 40px rgba(0,0,0,0.5)'
             }}
-            onClick={(e) => e.stopPropagation()} // Clicking the image itself shouldn't close it
+            onClick={(e) => e.stopPropagation()}
           />
-        </div>
+        </div>,
+        document.body
       )}
     </>
   )

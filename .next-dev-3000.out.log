@@ -1,0 +1,34 @@
+
+> agenda-online@0.1.0 dev
+> next dev -p 3000
+
+▲ Next.js 16.2.4 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.1.17:3000
+- Environments: .env.local
+✓ Ready in 639ms
+
+ GET /agendar/lindonas 200 in 1339ms (next.js: 936ms, application-code: 403ms)
+ GET /agendar/lindonas 200 in 86ms (next.js: 16ms, application-code: 70ms)
+ GET /agendar/lindonas 200 in 89ms (next.js: 13ms, application-code: 76ms)
+ GET /api/public-booking/lindonas 200 in 3.9s (next.js: 1234ms, application-code: 2.7s)
+ GET /agendar/lindonas 200 in 178ms (next.js: 79ms, application-code: 99ms)
+ GET /admin 200 in 258ms (next.js: 34ms, application-code: 224ms)
+ GET /admin/login 200 in 66ms (next.js: 30ms, application-code: 36ms)
+ GET /admin/login 200 in 308ms (next.js: 71ms, application-code: 236ms)
+ GET /admin/login 200 in 47ms (next.js: 3ms, application-code: 44ms)
+✓ Finished filesystem cache database compaction in 19.3s
+ GET /admin/login 200 in 56ms (next.js: 3ms, application-code: 53ms)
+ GET /admin/login 200 in 54ms (next.js: 4ms, application-code: 51ms)
+ GET /admin/login 200 in 83ms (next.js: 3ms, application-code: 80ms)
+✓ Compiled in 64ms
+ GET /admin/login 200 in 136ms (next.js: 67ms, application-code: 68ms)
+✓ Compiled in 56ms
+ GET /admin/login 200 in 120ms (next.js: 68ms, application-code: 52ms)
+✓ Compiled in 131ms
+ GET /admin/login 200 in 184ms (next.js: 61ms, application-code: 123ms)
+ GET /admin/login 200 in 55ms (next.js: 4ms, application-code: 51ms)
+ GET /admin/login 200 in 32ms (next.js: 5ms, application-code: 27ms)
+ GET /admin/login 200 in 188ms (next.js: 3ms, application-code: 186ms)
+✓ Finished filesystem cache database compaction in 11.4s
+✓ Finished filesystem cache database compaction in 30.8s

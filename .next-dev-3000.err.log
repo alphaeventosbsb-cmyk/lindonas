@@ -1,0 +1,8 @@
+[browser] Detected `scroll-behavior: smooth` on the `<html>` element. To disable smooth scrolling during route transitions, add `data-scroll-behavior="smooth"` to your <html> element. Learn more: https://nextjs.org/docs/messages/missing-data-scroll-behavior (file://C:/Users/bruno/OneDrive/Desktop/sistema de agendamento online/agenda-online/.next/dev/static/chunks/0riu_next_dist_0ab.xl9._.js:2431:13)
+[browser] Permission denied fetching settings. (file://C:/Users/bruno/OneDrive/Desktop/sistema de agendamento online/agenda-online/.next/dev/static/chunks/0riu_next_dist_0ab.xl9._.js:2431:13)
+[browser] Login error: auth/popup-closed-by-user FirebaseError: Firebase: Error (auth/popup-closed-by-user).
+    at createErrorInternal (file://C:/Users/bruno/OneDrive/Desktop/sistema de agendamento online/agenda-online/.next/dev/static/chunks/0riu_%40firebase_auth_dist_esm_0v8.qhu._.js:646:41)
+    at _createError (file://C:/Users/bruno/OneDrive/Desktop/sistema de agendamento online/agenda-online/.next/dev/static/chunks/0riu_%40firebase_auth_dist_esm_0v8.qhu._.js:613:12)
+    at <unknown> (file://C:/Users/bruno/OneDrive/Desktop/sistema de agendamento online/agenda-online/.next/dev/static/chunks/0riu_%40firebase_auth_dist_esm_0v8.qhu._.js:9168:33) (file://C:/Users/bruno/OneDrive/Desktop/sistema de agendamento online/agenda-online/.next/dev/static/chunks/agenda-online_src_0grcqjj._.js:882:21)
+[browser] NotAllowedError: Failed to execute 'writeText' on 'Clipboard': Write permission denied.
+NotAllowedError: Failed to execute 'writeText' on 'Clipboard': Write permission denied. (file://C:/Users/bruno/OneDrive/Desktop/sistema de agendamento online/agenda-online/.next/dev/static/chunks/0riu_next_dist_0ab.xl9._.js:2431:13)

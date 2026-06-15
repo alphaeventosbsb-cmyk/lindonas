@@ -1,0 +1,1 @@
+firebase-adminsdk-fbsvc@agenda-online-84213.iam.gserviceaccount.com

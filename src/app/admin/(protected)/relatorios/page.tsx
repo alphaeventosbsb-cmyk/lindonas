@@ -9,6 +9,7 @@ import { PieChart, Pie, Cell, Legend, Tooltip, ResponsiveContainer } from "recha
 import { PermissionGate } from "@/components/ui/permission-gate"
 import { usePermission } from "@/lib/rbac/usePermission"
 import { DailyFinancialModal } from "@/components/admin/relatorios/daily-financial-modal"
+import { ExportButtons } from "@/components/ui/export-buttons"
 
 const inputStyle: React.CSSProperties = { padding: '0.75rem 1rem', borderRadius: '0.75rem', border: '2px solid #e2e8f0', backgroundColor: '#fff', color: '#1e1e2d', fontSize: '0.875rem', fontWeight: 500, outline: 'none' }
 type ReportTab = "revenue" | "clients" | "professionals" | "payments" | "services"
@@ -107,6 +108,82 @@ export default function RelatoriosPage() {
 
   const handlePrint = () => window.print()
 
+  const getActiveTabExportData = () => {
+    switch (activeTab) {
+      case "revenue":
+        return {
+          title: `Receita por Pagamento - ${periodStart} a ${periodEnd}`,
+          fileName: `receita_${periodStart}_${periodEnd}`,
+          data: pieData,
+          columns: [
+            { header: "Forma de Pagamento", key: "name" },
+            { header: "Valor Total", key: "value", format: (v: any) => formatCurrency(Number(v)) }
+          ]
+        }
+      case "clients":
+        return {
+          title: `Clientes Devedores - ${periodStart} a ${periodEnd}`,
+          fileName: `clientes_devedores_${periodStart}_${periodEnd}`,
+          data: debtors,
+          columns: [
+            { header: "Cliente", key: "name" },
+            { header: "Telefone", key: "phone" },
+            { header: "Valor em Débito", key: "debt_amount", format: (v: any) => formatCurrency(Number(v)) }
+          ]
+        }
+      case "professionals":
+        return {
+          title: `Desempenho de Profissionais - ${periodStart} a ${periodEnd}`,
+          fileName: `desempenho_profissionais_${periodStart}_${periodEnd}`,
+          data: empPerformance,
+          columns: [
+            { header: "Profissional", key: "name" },
+            { header: "Serviços Realizados", key: "serviceCount" },
+            { header: "Receita Gerada", key: "revenue", format: (v: any) => formatCurrency(Number(v)) },
+            { header: "Comissão Gerada", key: "commission", format: (v: any) => formatCurrency(Number(v)) },
+            { header: "Comissão Base (%)", key: "commission_percent", format: (v: any) => `${v || 0}%` }
+          ]
+        }
+      case "payments":
+        return {
+          title: `Receita por Pagamento Detalhada - ${periodStart} a ${periodEnd}`,
+          fileName: `receita_detalhada_${periodStart}_${periodEnd}`,
+          data: Object.entries(paymentMethods).map(([k, v]) => ({ method: paymentLabels[k] || k, amount: v })),
+          columns: [
+            { header: "Forma de Pagamento", key: "method" },
+            { header: "Valor Total", key: "amount", format: (v: any) => formatCurrency(Number(v)) }
+          ]
+        }
+      case "services":
+        return {
+          title: `Serviços Mais Realizados - ${periodStart} a ${periodEnd}`,
+          fileName: `servicos_realizados_${periodStart}_${periodEnd}`,
+          data: topServices,
+          columns: [
+            { header: "Serviço", key: "name" },
+            { header: "Quantidade Realizada", key: "count" },
+            { header: "Receita Total", key: "revenue", format: (v: any) => formatCurrency(Number(v)) }
+          ]
+        }
+      default:
+        return { title: "", fileName: "", data: [], columns: [] }
+    }
+  }
+
+  const exportConfig = getActiveTabExportData()
+
+  const dailyLedgerExportConfig = {
+    title: `Histórico Diário - ${periodStart} a ${periodEnd}`,
+    fileName: `historico_diario_${periodStart}_${periodEnd}`,
+    data: dailyReport,
+    columns: [
+      { header: "Data", key: "date", format: (v: any) => String(v).split('-').reverse().join('/') },
+      { header: "Entradas", key: "income", format: (v: any) => formatCurrency(Number(v)) },
+      { header: "Saídas", key: "expense", format: (v: any) => formatCurrency(Number(v)) },
+      { header: "Saldo", key: "balance", format: (v: any, row: any) => formatCurrency((row.income || 0) - (row.expense || 0)) }
+    ]
+  }
+
   if (loading) return <div className="flex justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-[#7c5cfc]" /></div>
 
   return (
@@ -167,8 +244,14 @@ export default function RelatoriosPage() {
             ))}
           </div>
           <PermissionGate permission="reports.print">
+            <ExportButtons 
+              data={exportConfig.data}
+              columns={exportConfig.columns}
+              fileName={exportConfig.fileName}
+              title={exportConfig.title}
+            />
             <button onClick={handlePrint} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.625rem 1rem', borderRadius: '0.75rem', border: '1px solid #e5e7eb', background: '#fff', color: '#374151', fontWeight: 600, fontSize: '0.8125rem', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-              <Printer style={{ width: '1rem', height: '1rem' }} /> Exportar PDF
+              <Printer style={{ width: '1rem', height: '1rem' }} /> Imprimir Tela
             </button>
           </PermissionGate>
         </div>
@@ -179,14 +262,24 @@ export default function RelatoriosPage() {
         {/* Daily Report List */}
         <PermissionGate permission="reports.financial">
           <div style={{ background: '#fff', borderRadius: '1rem', border: '1px solid #e5e7eb', overflow: 'hidden', gridColumn: '1 / -1' }}>
-            <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid #f3f4f6', background: '#fafbfc', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <div style={{ width: '2.25rem', height: '2.25rem', borderRadius: '0.625rem', background: 'linear-gradient(135deg, #7c5cfc, #a78bfa)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <CalendarDays style={{ width: '1.125rem', height: '1.125rem', color: '#fff' }} />
+            <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid #f3f4f6', background: '#fafbfc', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div style={{ width: '2.25rem', height: '2.25rem', borderRadius: '0.625rem', background: 'linear-gradient(135deg, #7c5cfc, #a78bfa)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <CalendarDays style={{ width: '1.125rem', height: '1.125rem', color: '#fff' }} />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '1.125rem', fontWeight: 800, color: '#1e1e2d', fontFamily: "var(--font-heading)" }}>Histórico Diário</h3>
+                  <p style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.125rem' }}>Selecione um dia para ver o detalhamento completo de caixa e financeiro.</p>
+                </div>
               </div>
-              <div>
-                <h3 style={{ fontSize: '1.125rem', fontWeight: 800, color: '#1e1e2d', fontFamily: "var(--font-heading)" }}>Histórico Diário</h3>
-                <p style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.125rem' }}>Selecione um dia para ver o detalhamento completo de caixa e financeiro.</p>
-              </div>
+              <PermissionGate permission="reports.print">
+                <ExportButtons 
+                  data={dailyLedgerExportConfig.data}
+                  columns={dailyLedgerExportConfig.columns}
+                  fileName={dailyLedgerExportConfig.fileName}
+                  title={dailyLedgerExportConfig.title}
+                />
+              </PermissionGate>
             </div>
             
             <div style={{ overflowX: 'auto' }}>

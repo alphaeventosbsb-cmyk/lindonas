@@ -8,6 +8,7 @@ interface ImportPreviewModalProps {
   moduleType: "clientes" | "estoque" | "servicos"
   onClose: () => void
   fullData?: Record<string, unknown>[]
+  extraData?: Record<string, unknown>
   onConfirm?: (data: Record<string, unknown>[], mappedKeys: string[], columnMapping: Record<string, string>) => Promise<void>
 }
 
@@ -22,7 +23,7 @@ const modalStyle: React.CSSProperties = {
   maxHeight: '90vh', overflow: 'hidden'
 }
 
-export function ImportPreviewModal({ moduleType, onClose, fullData, onConfirm }: ImportPreviewModalProps) {
+export function ImportPreviewModal({ moduleType, onClose, fullData, extraData, onConfirm }: ImportPreviewModalProps) {
   const [isDragging, setIsDragging] = useState(false)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -257,6 +258,84 @@ export function ImportPreviewModal({ moduleType, onClose, fullData, onConfirm }:
             })
           }
         }
+      } else if (moduleType === "servicos") {
+        const categories = (extraData?.categories as Record<string, unknown>[]) || []
+        const nameCol = Object.keys(columnMapping).find(k => columnMapping[k] === "name")
+        const categoryCol = Object.keys(columnMapping).find(k => columnMapping[k] === "category")
+        const priceCol = Object.keys(columnMapping).find(k => columnMapping[k] === "price")
+        const commissionCol = Object.keys(columnMapping).find(k => columnMapping[k] === "commission")
+        
+        const nameVal = nameCol ? String(row[nameCol] || "").trim() : ""
+        const categoryVal = categoryCol ? String(row[categoryCol] || "").trim() : ""
+        const commissionVal = commissionCol ? String(row[commissionCol] || "").trim() : ""
+
+        if (commissionVal) {
+          isWarning = true
+          generatedNotes = "Comissão informada na importação: " + commissionVal
+        }
+
+        let isCatFound = false
+        if (categoryVal) {
+          const matched = categories.find((c: Record<string, unknown>) => String(c.name || "").toLowerCase().trim() === categoryVal.toLowerCase())
+          if (matched) isCatFound = true
+        }
+
+        if (categoryVal && !isCatFound) {
+          isWarning = true
+          generatedNotes = (generatedNotes ? generatedNotes + " | " : "") + "Categoria não encontrada, serviço será importado sem categoria."
+        }
+
+        const parseBrazilianNum = (val: string) => {
+          if (!val) return 0
+          const clean = val.replace(/[R$\s]/g, "")
+          if (clean.includes(",") && clean.includes(".")) {
+            return parseFloat(clean.replace(/\./g, "").replace(",", "."))
+          } else if (clean.includes(",")) {
+            return parseFloat(clean.replace(",", "."))
+          }
+          return parseFloat(clean)
+        }
+
+        const priceVal = priceCol ? parseBrazilianNum(String(row[priceCol] || "")) : 0
+
+        if (!nameVal) {
+          isError = true
+          errorMsg = "serviço sem nome"
+        } else if (priceVal < 0) {
+          isError = true
+          errorMsg = "valor não pode ser negativo"
+        }
+
+        if (!isError) {
+          const normalize = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim()
+          
+          const compKey = normalize(nameVal)
+          if (seenPhones.has(compKey)) {
+             isWarning = true
+             generatedNotes = (generatedNotes ? generatedNotes + " | " : "") + "Possível duplicado interno (mesmo nome na planilha)."
+          } else {
+             seenPhones.add(compKey);
+          }
+
+          if (fullData && fullData.length > 0) {
+            const existingMatch = fullData.find((existing: Record<string, unknown>) => {
+              return normalize(String(existing.name || "")) === normalize(nameVal)
+            })
+
+            if (existingMatch) {
+               const existingCatId = existingMatch.category_id
+               const existingCat = categories.find((c: Record<string, unknown>) => String(c.id || "") === String(existingCatId || ""))
+               const existingCatName = existingCat ? normalize(String(existingCat.name || "")) : ""
+
+               if (categoryVal && existingCatName === normalize(categoryVal)) {
+                  isDuplicate = true
+               } else {
+                  isWarning = true
+                  generatedNotes = (generatedNotes ? generatedNotes + " | " : "") + "Possível duplicado (nome já existe, mas categoria diferente ou vazia)."
+               }
+            }
+          }
+        }
       }
       
       return {
@@ -267,7 +346,7 @@ export function ImportPreviewModal({ moduleType, onClose, fullData, onConfirm }:
         _generatedNotes: generatedNotes
       }
     })
-  }, [rawValidData, columnMapping, fullData, moduleType])
+  }, [rawValidData, columnMapping, fullData, moduleType, extraData?.categories])
 
   const previewData = useMemo(() => processedData.slice(0, 10), [processedData])
 
@@ -402,12 +481,14 @@ export function ImportPreviewModal({ moduleType, onClose, fullData, onConfirm }:
                   </div>
                 </div>
               )}
-              {['clientes', 'estoque'].includes(moduleType) && mappedKeys.length > 0 && (
+              {['clientes', 'estoque', 'servicos'].includes(moduleType) && mappedKeys.length > 0 && (
                 <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '0.5rem', padding: '1rem' }}>
                   <h4 style={{ margin: '0 0 0.75rem', fontSize: '0.875rem', fontWeight: 600, color: '#334155' }}>Mapeamento de Colunas</h4>
-                  <div style={{ display: 'grid', gridTemplateColumns: moduleType === 'estoque' ? 'repeat(4, 1fr)' : 'repeat(4, 1fr)', gap: '1rem' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem' }}>
                     {(moduleType === 'clientes' 
                       ? ['name', 'phone', 'email', 'cpf'] 
+                      : moduleType === 'servicos'
+                      ? ['name', 'category', 'duration', 'price', 'commission', 'description', 'status', 'online']
                       : ['name', 'category', 'sku', 'barcode', 'stock_quantity', 'min_stock', 'unit', 'cost_price', 'sell_price', 'supplier', 'manufacturer', 'status']
                     ).map(field => {
                       const labelMap: Record<string, string> = { 
@@ -415,7 +496,8 @@ export function ImportPreviewModal({ moduleType, onClose, fullData, onConfirm }:
                         category: "Categoria", sku: "Código/SKU", barcode: "Cód. Barras",
                         stock_quantity: "Quantidade", unit: "Unidade", min_stock: "Estoque Mín.",
                         cost_price: "Preço Custo", sell_price: "Preço Venda", supplier: "Fornecedor",
-                        manufacturer: "Fabricante/Marca", status: "Status"
+                        manufacturer: "Fabricante/Marca", status: "Status", duration: "Duração (min)",
+                        price: "Valor", commission: "Comissão", description: "Descrição", online: "Visível Online"
                       }
                       const currentMappedCol = Object.keys(columnMapping).find(k => columnMapping[k] === field) || ""
                       
@@ -505,7 +587,11 @@ export function ImportPreviewModal({ moduleType, onClose, fullData, onConfirm }:
                         <td style={{ padding: '0.75rem', color: '#475569', whiteSpace: 'nowrap', fontWeight: 600 }}>
                           {row._status === 'error' && <span style={{ color: '#ef4444' }}>Erro: {row._errorMsg}</span>}
                           {row._status === 'duplicate' && <span style={{ color: '#d97706' }}>Duplicado / Ignorado</span>}
-                          {row._status === 'warning' && <span style={{ color: '#b45309' }}>Aviso: nome vazio, será importado como {row._generatedName}</span>}
+                          {row._status === 'warning' && (
+                            <span style={{ color: '#b45309' }}>
+                              Aviso: {row._generatedNotes ? row._generatedNotes : (row._generatedName ? `nome vazio, será importado como ${row._generatedName}` : "Verifique a linha")}
+                            </span>
+                          )}
                           {row._status === 'valid' && <span style={{ color: '#10b981' }}>Válido (Criar)</span>}
                         </td>
                       </tr>
@@ -539,19 +625,7 @@ export function ImportPreviewModal({ moduleType, onClose, fullData, onConfirm }:
 
               {importSummary.warning > 0 && (
                 <div style={{ marginTop: '0.75rem', background: '#fef9c3', border: '1px solid #fde047', borderRadius: '0.5rem', padding: '0.75rem', fontSize: '0.8125rem', color: '#854d0e' }}>
-                  <strong>Atenção:</strong> {importSummary.warning} {moduleType === 'clientes' ? 'clientes' : 'produtos'} com nome vazio serão importados com um nome provisório (ex: &quot;{moduleType === 'clientes' ? 'Cliente' : 'Produto'} sem nome - Código&quot;) para revisão manual.
-                </div>
-              )}
-
-              {moduleType === "servicos" && (
-                <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '0.75rem', padding: '1rem', display: 'flex', gap: '0.75rem' }}>
-                  <AlertCircle style={{ width: '20px', height: '20px', color: '#d97706', flexShrink: 0 }} />
-                  <div>
-                    <p style={{ margin: 0, fontSize: '0.875rem', fontWeight: 600, color: '#92400e' }}>Aviso da Fase 1</p>
-                    <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.8125rem', color: '#b45309' }}>
-                      Esta é apenas uma prévia. **Nada será salvo no banco de dados agora para Serviços.** O salvamento completo deste módulo será implementado na fase futura.
-                    </p>
-                  </div>
+                  <strong>Atenção:</strong> {importSummary.warning} {moduleType === 'clientes' ? 'clientes' : moduleType === 'estoque' ? 'produtos' : 'serviços'} com nome vazio serão importados com um nome provisório (ex: &quot;{moduleType === 'clientes' ? 'Cliente' : moduleType === 'estoque' ? 'Produto' : 'Serviço'} sem nome - Código&quot;) para revisão manual.
                 </div>
               )}
             </div>
@@ -568,7 +642,7 @@ export function ImportPreviewModal({ moduleType, onClose, fullData, onConfirm }:
             Cancelar
           </button>
           
-          {['clientes', 'estoque'].includes(moduleType) ? (
+          {['clientes', 'estoque', 'servicos'].includes(moduleType) ? (
             <button 
               disabled={importSummary.toCreate === 0 || saving}
               onClick={handleConfirmAction}

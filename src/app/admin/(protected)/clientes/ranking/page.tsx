@@ -6,6 +6,7 @@ import type { Client, Appointment } from "@/lib/types/database"
 import { formatCurrency } from "@/lib/utils"
 import { Loader2, Trophy, ArrowUpRight, ArrowDownRight, Star, Calendar } from "lucide-react"
 import { ExpandableImage } from "@/components/ui/expandable-image"
+import { ExportButtons } from "@/components/ui/export-buttons"
 
 type Period = "all" | "today" | "week" | "month" | "year"
 type SortBy = "visits" | "revenue" | "ticket"
@@ -92,6 +93,21 @@ export default function RankingClientesPage() {
     return data
   }, [clients, appointments, period, sortBy])
 
+  const exportConfig = {
+    title: `Ranking de Clientes (${period})`,
+    fileName: `ranking_clientes_${period}`,
+    data: rankingData.map((c, idx) => ({ ...c, position: idx + 1 })),
+    columns: [
+      { header: "Posição", key: "position" },
+      { header: "Cliente", key: "name", format: (v: any, row: any) => `${v}${row.is_vip ? " (VIP)" : ""}` },
+      { header: "Telefone", key: "phone", format: (v: any) => v || "—" },
+      { header: "Visitas", key: "stats", format: (v: any) => String(v.visits) },
+      { header: "Ticket Médio", key: "stats", format: (v: any) => formatCurrency(v.ticket) },
+      { header: "Faturamento", key: "stats", format: (v: any) => formatCurrency(v.revenue) },
+      { header: "Última Visita", key: "stats", format: (v: any) => v.lastVisit ? new Date(v.lastVisit).toLocaleDateString('pt-BR') : "—" }
+    ]
+  }
+
   if (loading) return <div className="flex justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-[#7c5cfc]" /></div>
 
   const topClient = rankingData[0]
@@ -134,26 +150,36 @@ export default function RankingClientesPage() {
 
       {/* Controls */}
       <div style={{ background: '#fff', borderRadius: '1rem', padding: '1rem', border: '1px solid #e5e7eb', display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <Calendar style={{ width: '1.25rem', height: '1.25rem', color: '#64748b' }} />
-          <select value={period} onChange={e => setPeriod(e.target.value as Period)}
-            style={{ padding: '0.625rem 1rem', borderRadius: '0.75rem', border: '2px solid #e2e8f0', backgroundColor: '#fff', fontSize: '0.875rem', fontWeight: 600, outline: 'none', cursor: 'pointer' }}>
-            <option value="all">Todo o Período</option>
-            <option value="today">Hoje</option>
-            <option value="week">Esta Semana</option>
-            <option value="month">Este Mês</option>
-            <option value="year">Este Ano</option>
-          </select>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <Calendar style={{ width: '1.25rem', height: '1.25rem', color: '#64748b' }} />
+            <select value={period} onChange={e => setPeriod(e.target.value as Period)}
+              style={{ padding: '0.625rem 1rem', borderRadius: '0.75rem', border: '2px solid #e2e8f0', backgroundColor: '#fff', fontSize: '0.875rem', fontWeight: 600, outline: 'none', cursor: 'pointer' }}>
+              <option value="all">Todo o Período</option>
+              <option value="today">Hoje</option>
+              <option value="week">Esta Semana</option>
+              <option value="month">Este Mês</option>
+              <option value="year">Este Ano</option>
+            </select>
+          </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#64748b' }}>Ordenar por:</span>
-          <select value={sortBy} onChange={e => setSortBy(e.target.value as SortBy)}
-            style={{ padding: '0.625rem 1rem', borderRadius: '0.75rem', border: '2px solid #e2e8f0', backgroundColor: '#fff', fontSize: '0.875rem', fontWeight: 600, outline: 'none', cursor: 'pointer' }}>
-            <option value="revenue">Maior Faturamento</option>
-            <option value="visits">Mais Visitas</option>
-            <option value="ticket">Maior Ticket Médio</option>
-          </select>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <ExportButtons 
+            data={exportConfig.data}
+            columns={exportConfig.columns}
+            fileName={exportConfig.fileName}
+            title={exportConfig.title}
+          />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#64748b' }}>Ordenar por:</span>
+            <select value={sortBy} onChange={e => setSortBy(e.target.value as SortBy)}
+              style={{ padding: '0.625rem 1rem', borderRadius: '0.75rem', border: '2px solid #e2e8f0', backgroundColor: '#fff', fontSize: '0.875rem', fontWeight: 600, outline: 'none', cursor: 'pointer' }}>
+              <option value="revenue">Maior Faturamento</option>
+              <option value="visits">Mais Visitas</option>
+              <option value="ticket">Maior Ticket Médio</option>
+            </select>
+          </div>
         </div>
       </div>
 

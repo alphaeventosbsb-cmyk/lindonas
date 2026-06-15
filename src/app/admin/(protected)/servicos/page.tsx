@@ -149,6 +149,116 @@ export default function ServicosPage() {
     }
   }
 
+  const handleImportConfirm = async (payloads: any[]) => {
+    let successCount = 0
+    let failCount = 0
+    let duplicateCount = 0
+
+    const latestCategories = await fetchCollection<Category>("categories", "display_order")
+
+    for (const p of payloads) {
+      if (p._status === "duplicate") {
+        duplicateCount++
+        continue
+      }
+      
+      try {
+        let catId = null
+        if (p.category) {
+          const matchedCat = latestCategories.find(c => c.name.toLowerCase().trim() === String(p.category).toLowerCase().trim())
+          if (matchedCat) {
+            catId = matchedCat.id
+          }
+        }
+        
+        const parseBrazilianNum = (val: string) => {
+          if (!val) return 0
+          const clean = val.replace(/[R$\s]/g, "")
+          if (clean.includes(",") && clean.includes(".")) {
+            return parseFloat(clean.replace(/\./g, "").replace(",", "."))
+          } else if (clean.includes(",")) {
+            return parseFloat(clean.replace(",", "."))
+          }
+          return parseFloat(clean)
+        }
+
+        const parseDuration = (val: string) => {
+          if (!val) return 60
+          const s = String(val).toLowerCase().trim()
+          if (s.includes("h")) {
+            const parts = s.split("h")
+            const h = parseInt(parts[0]) || 0
+            const m = parseInt(parts[1]) || 0
+            return h * 60 + m
+          }
+          if (s.includes(":")) {
+            const parts = s.split(":")
+            const h = parseInt(parts[0]) || 0
+            const m = parseInt(parts[1]) || 0
+            return h * 60 + m
+          }
+          const num = parseInt(s.replace(/\D/g, ""))
+          return isNaN(num) ? 60 : num
+        }
+        
+        const parseStatus = (val: string) => {
+          if (val === undefined || val === null || val === "") return true
+          const s = String(val).toLowerCase().trim()
+          if (['ativo', 'sim', 'true', '1', 'ativa'].includes(s)) return true
+          if (['inativo', 'nao', 'não', 'false', '0', 'inativa'].includes(s)) return false
+          return true
+        }
+
+        const parseOnlineVisibility = (val: string) => {
+          if (val === undefined || val === null || val === "") return false
+          const s = String(val).toLowerCase().trim()
+          if (['sim', 'true', '1', 'online', 'visível', 'visivel'].includes(s)) return false
+          if (['nao', 'não', 'false', '0', 'invisível', 'invisivel'].includes(s)) return true
+          return false
+        }
+
+        let finalDescription = p.description ? String(p.description) : ""
+        if (p._generatedNotes && typeof p._generatedNotes === 'string' && p._generatedNotes.includes("Comissão informada na importação:")) {
+           const match = p._generatedNotes.match(/Comissão informada na importação:[^|]+/)
+           if (match) {
+             finalDescription = finalDescription ? finalDescription + "\n\n" + match[0].trim() : match[0].trim()
+           }
+        }
+
+        const saveData = {
+          name: p._status === "warning" && p._generatedName ? p._generatedName : p.name,
+          description: finalDescription,
+          category_id: catId,
+          price: p.price ? parseBrazilianNum(String(p.price)) : 0,
+          price_type: "fixed",
+          duration_minutes: p.duration ? parseDuration(String(p.duration)) : 60,
+          is_active: p.status !== undefined ? parseStatus(String(p.status)) : true,
+          hide_from_online_booking: p.online !== undefined ? parseOnlineVisibility(String(p.online)) : false,
+          color_hex: "",
+          promotional_price: null,
+          product_average_cost: null,
+          professional_product_average_cost: null,
+          disposable_expenses: null,
+          establishment_operational_cost: null,
+          professional_operational_cost: null,
+          featured: false,
+          display_order: services.length + successCount,
+        }
+
+        await createDocument("services", saveData)
+        successCount++
+      } catch (err) {
+        console.error("Failed to import service:", err)
+        failCount++
+      }
+    }
+
+    if (successCount > 0) toast.success(`${successCount} serviço(s) importados!`)
+    if (failCount > 0) toast.error(`${failCount} falharam.`)
+    if (duplicateCount > 0) toast.info(`${duplicateCount} duplicados ignorados.`)
+    load()
+  }
+
   const toggleSelection = (id: string) => {
     setSelectedIds(prev => {
       const next = new Set(prev)
@@ -289,6 +399,8 @@ export default function ServicosPage() {
             fileName={`servicos-${new Date().toISOString().split('T')[0]}`}
             title="Relatório de Serviços"
             importModule="servicos"
+            fullData={services}
+            onImportConfirm={handleImportConfirm}
           />
         </div>
       </div>

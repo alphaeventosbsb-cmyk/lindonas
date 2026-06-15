@@ -10,6 +10,7 @@ import { usePermission } from "@/lib/rbac/usePermission"
 import { PermissionGate } from "@/components/ui/permission-gate"
 import { useTenant } from "@/lib/auth/tenant-context"
 import { CashMovementDetailsModal } from "@/components/admin/caixa/cash-movement-details-modal"
+import { ExportButtons } from "@/components/ui/export-buttons"
 
 const inputStyle: React.CSSProperties = {
   width: '100%', padding: '0.75rem 1rem', borderRadius: '0.75rem',
@@ -166,6 +167,21 @@ export default function CaixaPage() {
     return map[id] || id
   }
 
+  const exportConfig = {
+    title: `Fechamentos do Caixa - ${searchDate}`,
+    fileName: `caixa_${searchDate}`,
+    data: financialEntries,
+    columns: [
+      { header: "Hora", key: "created_at", format: (v: any) => v && !isNaN(new Date(v).getTime()) ? new Date(v).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : "--:--" },
+      { header: "Cliente", key: "client_name", format: (v: any) => v || "Avulso" },
+      { header: "Serviço", key: "service_name", format: (v: any, row: any) => v || row.description || "—" },
+      { header: "Profissional", key: "employee_name", format: (v: any) => v || "Vários" },
+      { header: "Forma de Pagamento", key: "payment_method", format: (v: any) => getMethodLabel(String(v)) },
+      { header: "Valor", key: "amount", format: (v: any, row: any) => `${row.type === "expense" ? "-" : ""}${formatCurrency(row.paid_amount || row.amount)}` },
+      { header: "Status", key: "payment_status", format: (v: any, row: any) => row.is_refunded ? "ESTORNADO" : v === "partial" ? "PARCIAL" : "PAGO" }
+    ]
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', paddingBottom: '3rem' }}>
       
@@ -198,6 +214,15 @@ export default function CaixaPage() {
             style={{ padding: '0.5rem 1rem', borderRadius: '0.5rem', border: '2px solid #e8ecf4', background: '#fff', color: '#64748b', fontSize: '0.8125rem', fontWeight: 600, cursor: 'pointer' }}>
             Hoje
           </button>
+          
+          <PermissionGate permission="cash.view">
+            <ExportButtons 
+              data={exportConfig.data}
+              columns={exportConfig.columns}
+              fileName={exportConfig.fileName}
+              title={exportConfig.title}
+            />
+          </PermissionGate>
         </div>
       </div>
 

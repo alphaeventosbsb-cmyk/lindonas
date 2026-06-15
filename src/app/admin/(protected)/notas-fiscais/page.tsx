@@ -9,6 +9,7 @@ import { toast } from "sonner"
 import { useConfirm } from "@/components/ui/confirm-modal"
 import { usePermission } from "@/lib/rbac/usePermission"
 import { PermissionGate } from "@/components/ui/permission-gate"
+import { ExportButtons } from "@/components/ui/export-buttons"
 
 const inputStyle: React.CSSProperties = {
   width: '100%', padding: '0.75rem 1rem', borderRadius: '0.75rem',
@@ -127,6 +128,21 @@ export default function NotasFiscaisPage() {
     }, 300)
   }
 
+  const exportConfig = {
+    title: `Notas Fiscais Emitidas`,
+    fileName: `notas_fiscais`,
+    data: filtered,
+    columns: [
+      { header: "Número NF", key: "invoice_number" },
+      { header: "Cliente", key: "client_name" },
+      { header: "Serviço", key: "service_name" },
+      { header: "Pagamento", key: "payment_method", format: (v: any) => paymentLabels[String(v)] || String(v) },
+      { header: "Valor", key: "amount", format: (v: any) => formatCurrency(Number(v)) },
+      { header: "Data Emissão", key: "issued_at", format: (v: any) => v ? new Date(String(v)).toLocaleDateString('pt-BR') : "—" },
+      { header: "Status", key: "status", format: (v: any) => v === "issued" ? "Emitida" : "Cancelada" }
+    ]
+  }
+
   if (loading) return <div className="flex justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-[#7c5cfc]" /></div>
 
   return (
@@ -173,6 +189,12 @@ export default function NotasFiscaisPage() {
             style={{ ...inputStyle, paddingLeft: '2.5rem' }}
             placeholder="Buscar por cliente ou número..." />
         </div>
+        <ExportButtons 
+          data={exportConfig.data}
+          columns={exportConfig.columns}
+          fileName={exportConfig.fileName}
+          title={exportConfig.title}
+        />
         <PermissionGate permission="invoices.create">
           <button onClick={openNew}
             style={{ padding: '0.625rem 1.25rem', borderRadius: '0.75rem', color: '#fff', fontWeight: 700, fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: '0.5rem', border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg, #7c5cfc, #a78bfa)', boxShadow: '0 4px 14px rgba(124,92,252,0.3)', whiteSpace: 'nowrap' }}>

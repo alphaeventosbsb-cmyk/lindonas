@@ -14,10 +14,11 @@ interface ExportButtonsProps<T> {
   disabled?: boolean
   importModule?: "clientes" | "estoque" | "servicos"
   fullData?: T[]
+  extraData?: Record<string, unknown>
   onImportConfirm?: (data: Record<string, unknown>[], mappedKeys: string[], columnMapping: Record<string, string>) => Promise<void>
 }
 
-export function ExportButtons<T>({ data, columns, fileName, title, disabled = false, importModule, fullData, onImportConfirm }: ExportButtonsProps<T>) {
+export function ExportButtons<T>({ data, columns, fileName, title, disabled = false, importModule, fullData, extraData, onImportConfirm }: ExportButtonsProps<T>) {
   const [exportingExcel, setExportingExcel] = useState(false)
   const [exportingPDF, setExportingPDF] = useState(false)
   const [showImportModal, setShowImportModal] = useState(false)
@@ -115,6 +116,7 @@ export function ExportButtons<T>({ data, columns, fileName, title, disabled = fa
           moduleType={importModule} 
           onClose={() => setShowImportModal(false)} 
           fullData={fullData as Record<string, unknown>[]}
+          extraData={extraData}
           onConfirm={onImportConfirm}
         />
       )}

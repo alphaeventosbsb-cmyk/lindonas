@@ -11,6 +11,7 @@ import { useTenant } from "@/lib/auth/tenant-context"
 import { toast } from "sonner"
 import { useConfirm } from "@/components/ui/confirm-modal"
 import { normalizeSearchText } from "@/lib/search"
+import { ExportButtons } from "@/components/ui/export-buttons"
 
 export default function DebitoClientePage() {
   const [clients, setClients] = useState<Client[]>([])
@@ -69,6 +70,24 @@ export default function DebitoClientePage() {
   const totalDebit = clients.reduce((sum, c) => sum + (c.debt_amount || 0), 0)
   const totalDebtors = clients.filter(c => c.debt_amount > 0).length
 
+  const exportData = transactions.filter(tx => 
+    filtered.some(c => c.id === tx.client_id)
+  )
+
+  const exportConfig = {
+    title: `Transações de Débito de Clientes`,
+    fileName: `transacoes_debito`,
+    data: exportData,
+    columns: [
+      { header: "Cliente", key: "client_id", format: (v: any) => clients.find(c => c.id === v)?.name || "Desconhecido" },
+      { header: "Valor (Débito)", key: "amount", format: (v: any) => formatCurrency(Number(v)) },
+      { header: "Origem", key: "origin", format: (v: any) => v || "—" },
+      { header: "Observações", key: "notes", format: (v: any) => v || "—" },
+      { header: "Data", key: "created_at", format: (v: any) => new Date(String(v)).toLocaleString('pt-BR') },
+      { header: "Responsável", key: "created_by_name", format: (v: any) => v || "Sistema" }
+    ]
+  }
+
   if (loading) return <div className="flex justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-[#7c5cfc]" /></div>
 
   return (
@@ -96,13 +115,19 @@ export default function DebitoClientePage() {
       </div>
 
       {/* Filters */}
-      <div style={{ background: '#fff', borderRadius: '1rem', padding: '1rem', border: '1px solid #e5e7eb', display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-        <div style={{ position: 'relative', flex: 1 }}>
+      <div style={{ background: '#fff', borderRadius: '1rem', padding: '1rem', border: '1px solid #e5e7eb', display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ position: 'relative', flex: 1, minWidth: '250px' }}>
           <Search style={{ position: 'absolute', left: '0.875rem', top: '50%', transform: 'translateY(-50%)', width: '1rem', height: '1rem', color: '#9ca3af' }} />
           <input type="text" value={search} onChange={e => setSearch(e.target.value)}
             style={{ width: '100%', padding: '0.75rem 1rem 0.75rem 2.5rem', borderRadius: '0.75rem', border: '2px solid #e2e8f0', fontSize: '0.875rem', outline: 'none' }}
             placeholder="Buscar cliente para adicionar débito..." />
         </div>
+        <ExportButtons 
+          data={exportConfig.data}
+          columns={exportConfig.columns}
+          fileName={exportConfig.fileName}
+          title={exportConfig.title}
+        />
       </div>
 
       {/* List */}

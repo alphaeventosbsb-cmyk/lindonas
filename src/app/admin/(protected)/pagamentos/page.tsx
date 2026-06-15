@@ -8,6 +8,8 @@ import { Loader2, CreditCard, Users, Clock, CheckCircle, Search, Filter, LayoutG
 import { CommissionModals } from "@/components/admin/pagamentos/commission-modals"
 import { usePermission } from "@/lib/rbac/usePermission"
 import { useTenant } from "@/lib/auth/tenant-context"
+import { ExportButtons } from "@/components/ui/export-buttons"
+import { PermissionGate } from "@/components/ui/permission-gate"
 
 export default function PagamentosPage() {
   const { can } = usePermission()
@@ -143,6 +145,34 @@ export default function PagamentosPage() {
     setActiveModal(modal)
   }
 
+  const exportData = filteredEmployees.map(emp => {
+    const stats = getEmployeeStats(emp.id)
+    return {
+      name: emp.name,
+      status: emp.is_active ? "Ativo" : "Inativo",
+      commission_percent: emp.commission_percent || 0,
+      totalServices: stats.totalServices,
+      totalRevenue: stats.totalRevenue,
+      totalCommission: stats.totalCommission,
+      pendingComms: stats.pendingComms
+    }
+  })
+
+  const exportConfig = {
+    title: `Relatório de Comissões - ${periodStart} a ${periodEnd}`,
+    fileName: `comissoes_${periodStart}_${periodEnd}`,
+    data: exportData,
+    columns: [
+      { header: "Profissional", key: "name" },
+      { header: "Status", key: "status" },
+      { header: "Comissão Base (%)", key: "commission_percent", format: (v: any) => `${v}%` },
+      { header: "Serviços Realizados", key: "totalServices" },
+      { header: "Receita Gerada", key: "totalRevenue", format: (v: any) => formatCurrency(Number(v)) },
+      { header: "Total Comissão", key: "totalCommission", format: (v: any) => formatCurrency(Number(v)) },
+      { header: "Comissões Pendentes", key: "pendingComms", format: (v: any) => formatCurrency(Number(v)) }
+    ]
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       
@@ -219,9 +249,18 @@ export default function PagamentosPage() {
             </div>
           </div>
 
-          {/* View Toggles */}
-          <div style={{ display: 'flex', gap: '0.375rem', background: '#f8fafc', padding: '0.25rem', borderRadius: '0.5rem', border: '1px solid #e2e8f0' }}>
-            <button 
+          {/* View Toggles & Export */}
+          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            <PermissionGate permission="commissions.view">
+              <ExportButtons 
+                data={exportConfig.data}
+                columns={exportConfig.columns}
+                fileName={exportConfig.fileName}
+                title={exportConfig.title}
+              />
+            </PermissionGate>
+            <div style={{ display: 'flex', gap: '0.375rem', background: '#f8fafc', padding: '0.25rem', borderRadius: '0.5rem', border: '1px solid #e2e8f0' }}>
+              <button 
               onClick={() => setViewMode("cards")}
               style={{
                 display: 'flex', alignItems: 'center', gap: '0.375rem', padding: '0.5rem 0.75rem', borderRadius: '0.375rem',
@@ -245,6 +284,7 @@ export default function PagamentosPage() {
             >
               <List style={{ width: '14px', height: '14px' }} /> Lista
             </button>
+          </div>
           </div>
         </div>
       </div>

@@ -195,7 +195,7 @@ function parseCsvText(csvText: string, separatorOverride: CsvSeparatorOption = "
       }
     }
 
-    let headers = parseLine(lines[0], bestSep).map(h => h.trim());
+    const headers = parseLine(lines[0], bestSep).map(h => h.trim());
     if (headers.length === 1) {
       if (headers[0].includes(';')) bestSep = ';';
       else if (headers[0].includes(',')) bestSep = ',';
@@ -295,7 +295,7 @@ export function validateImportRows(data: unknown[]): { valid: unknown[], errors:
   return { valid, errors }
 }
 
-export function previewImportData(_data: unknown[]) {
+export function previewImportData() {
   // Can be used to slice top 10 items. But UI might handle this.
 }
 
@@ -311,24 +311,27 @@ export function mapImportColumns(row: Record<string, unknown>, moduleType: "clie
       else if (cleanK === 'email' || cleanK === 'e-mail' || cleanK === 'mail') mapping.email = k
       else if (cleanK === 'cpf' || cleanK === 'documento' || cleanK === 'doc') mapping.cpf = k
     } else if (moduleType === "estoque") {
-      if (cleanK === 'nome do produto' || cleanK === 'produto' || cleanK === 'nome' || cleanK === 'item' || cleanK === 'descrição' || cleanK === 'descricao') mapping.name = k
-      else if (cleanK === 'categoria' || cleanK === 'grupo' || cleanK === 'tipo') mapping.category = k
-      else if (cleanK === 'código' || cleanK === 'codigo' || cleanK === 'cod' || cleanK === 'sku' || cleanK === 'referência' || cleanK === 'referencia') mapping.sku = k
-      else if (cleanK === 'código de barras' || cleanK === 'codigo de barras' || cleanK === 'barcode' || cleanK === 'ean' || cleanK === 'gtin') mapping.barcode = k
+      if (cleanK === 'nome' || cleanK === 'produto' || cleanK === 'nome do produto' || cleanK === 'item' || cleanK === 'descrição' || cleanK === 'descricao') mapping.name = k
+      else if (cleanK === 'categoria' || cleanK === 'grupo' || cleanK === 'tipo' || cleanK === 'marca') mapping.category = k
+      else if (cleanK === 'sku' || cleanK === 'código' || cleanK === 'codigo' || cleanK === 'cod' || cleanK === 'referência' || cleanK === 'referencia') mapping.sku = k
+      else if (cleanK === 'código de barras' || cleanK === 'codigo de barras' || cleanK === 'barcode' || cleanK === 'ean' || cleanK === 'gtin' || cleanK === 'código de barra' || cleanK === 'codigo de barra') mapping.barcode = k
       else if (cleanK === 'quantidade' || cleanK === 'qtd' || cleanK === 'estoque' || cleanK === 'estoque atual' || cleanK === 'saldo') mapping.stock_quantity = k
-      else if (cleanK === 'unidade' || cleanK === 'un' || cleanK === 'medida' || cleanK === 'und') mapping.unit = k
-      else if (cleanK === 'estoque mínimo' || cleanK === 'estoque minimo' || cleanK === 'mínimo' || cleanK === 'minimo') mapping.min_stock = k
-      else if (cleanK === 'custo' || cleanK === 'preço de custo' || cleanK === 'preco de custo' || cleanK === 'valor de custo') mapping.cost_price = k
-      else if (cleanK === 'preço' || cleanK === 'preco' || cleanK === 'preço de venda' || cleanK === 'preco de venda' || cleanK === 'valor' || cleanK === 'valor de venda') mapping.sell_price = k
-      else if (cleanK === 'fornecedor') mapping.supplier = k
-      else if (cleanK === 'fabricante' || cleanK === 'marca') mapping.manufacturer = k
-      else if (cleanK === 'status' || cleanK === 'situação' || cleanK === 'situacao' || cleanK === 'ativo') mapping.status = k
+      else if (cleanK === 'estoque mínimo' || cleanK === 'estoque minimo' || cleanK === 'mínimo' || cleanK === 'minimo' || cleanK === 'min' || cleanK === 'qtd minima' || cleanK === 'qtd mínima') mapping.min_stock = k
+      else if (cleanK === 'preço de custo' || cleanK === 'preco de custo' || cleanK === 'custo' || cleanK === 'valor de custo') mapping.cost_price = k
+      else if (cleanK === 'preço de venda' || cleanK === 'preco de venda' || cleanK === 'venda' || cleanK === 'valor de venda' || cleanK === 'preço' || cleanK === 'preco' || cleanK === 'valor') mapping.sell_price = k
+      else if (cleanK === 'unidade' || cleanK === 'un' || cleanK === 'medida' || cleanK === 'unidade de medida') mapping.unit = k
+      else if (cleanK === 'fornecedor' || cleanK === 'distribuidor') mapping.supplier = k
+      else if (cleanK === 'marca' || cleanK === 'fabricante') mapping.manufacturer = k
+      else if (cleanK === 'status' || cleanK === 'situação' || cleanK === 'ativo' || cleanK === 'situação') mapping.status = k
     } else if (moduleType === "servicos") {
-      if (cleanK.includes('categoria')) mapping.category = k
-      if (cleanK.includes('valor') || cleanK.includes('preco')) mapping.price = k
-      if (cleanK.includes('duracao') || cleanK.includes('tempo') || cleanK.includes('minutos')) mapping.duration_minutes = k
-      if (cleanK.includes('comissao') || cleanK.includes('%')) mapping.commission = k
-      if (cleanK.includes('descricao')) mapping.description = k
+      if (cleanK === 'serviço' || cleanK === 'servico' || cleanK === 'nome' || cleanK === 'nome do serviço' || cleanK === 'nome do servico' || cleanK === 'procedimento' || cleanK === 'descrição do serviço') mapping.name = k
+      else if (cleanK === 'categoria' || cleanK === 'grupo' || cleanK === 'tipo') mapping.category = k
+      else if (cleanK === 'duração' || cleanK === 'duracao' || cleanK === 'tempo' || cleanK === 'minutos' || cleanK === 'min') mapping.duration = k
+      else if (cleanK === 'valor' || cleanK === 'preço' || cleanK === 'preco' || cleanK === 'preço do serviço' || cleanK === 'preco do serviço' || cleanK === 'valor serviço' || cleanK === 'valor servico') mapping.price = k
+      else if (cleanK === 'comissão' || cleanK === 'comissao' || cleanK === 'percentual comissão' || cleanK === 'percentual comissao' || cleanK === 'comissão profissional') mapping.commission = k
+      else if (cleanK === 'descrição' || cleanK === 'descricao' || cleanK === 'observação' || cleanK === 'observacao' || cleanK === 'obs') mapping.description = k
+      else if (cleanK === 'status' || cleanK === 'situação' || cleanK === 'situacao' || cleanK === 'ativo') mapping.status = k
+      else if (cleanK === 'visível online' || cleanK === 'visivel online' || cleanK === 'agendamento online' || cleanK === 'online' || cleanK === 'site' || cleanK === 'app' || cleanK === 'reserva online') mapping.online = k
     }
   })
 

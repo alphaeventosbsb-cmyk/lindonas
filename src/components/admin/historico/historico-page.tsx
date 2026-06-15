@@ -7,6 +7,9 @@ import type { HistoryEvent } from "@/lib/firebase/history-service"
 import type { Client, Employee } from "@/lib/types/database"
 import { Search, History, Calendar, User, UserCog, Filter, Loader2, ArrowRight } from "lucide-react"
 import { useTenant } from "@/lib/auth/tenant-context"
+import { ExportButtons } from "@/components/ui/export-buttons"
+import type { ColumnDef } from "@/lib/export-utils"
+import { PermissionGate } from "@/components/ui/permission-gate"
 
 const getSafeDisplayName = (evt: any) => {
   const isMaster = evt.performed_by_email === 'carbeto34@gmail.com' || evt.performed_by_email === 'alphaeventosbsb@gmail.com';
@@ -130,6 +133,14 @@ export function HistoricoPage() {
     })
   }, [events, searchClient, actionFilter, userFilter, dateStart, dateEnd])
 
+  const exportColumns: ColumnDef<HistoryEvent>[] = useMemo(() => [
+    { header: "Data e Hora", key: "created_at", format: (v: any) => new Date(v as string).toLocaleString('pt-BR') },
+    { header: "Ação", key: "action_title" },
+    { header: "Cliente", key: "client_name", format: (v: any) => v || "—" },
+    { header: "Descrição", key: "action_description" },
+    { header: "Usuário", key: "performed_by_name", format: (_: any, row: HistoryEvent) => getSafeDisplayName(row) }
+  ], [])
+
   const ACTION_OPTIONS = [
     { label: 'Todas', value: 'all' },
     { label: 'Agendamento excluído', value: 'APPOINTMENT_DELETED' },
@@ -166,11 +177,23 @@ export function HistoricoPage() {
 
   return (
     <div style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-      <div>
-        <h1 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#1e1e2d', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <History style={{ color: '#7c5cfc' }} /> Histórico de Agendamentos
-        </h1>
-        <p style={{ color: '#64748b', fontSize: '0.875rem', marginTop: '0.25rem' }}>Auditoria completa de todas as ações no sistema.</p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
+        <div>
+          <h1 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#1e1e2d', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <History style={{ color: '#7c5cfc' }} /> Histórico de Agendamentos
+          </h1>
+          <p style={{ color: '#64748b', fontSize: '0.875rem', marginTop: '0.25rem' }}>Auditoria completa de todas as ações no sistema.</p>
+        </div>
+        <PermissionGate permission="reports.export">
+          <ExportButtons 
+            data={filteredEvents}
+            columns={exportColumns}
+            fileName={`auditoria_agendamentos_${new Date().toISOString().slice(0,10)}`}
+            title="Auditoria - Histórico de Agendamentos"
+            exportPermissionKey="reports.export"
+            moduleName="historico"
+          />
+        </PermissionGate>
       </div>
 
       {/* Filters */}

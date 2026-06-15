@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react"
 import { motion } from "framer-motion"
 import * as Popover from "@radix-ui/react-popover"
 import { useAgendaStore } from "./agenda-store"
+import { useBusinessSettings } from "@/lib/auth/tenant-context"
+import { ExpandableImage } from "@/components/ui/expandable-image"
 import { statusCfg } from "./status-config"
 import type { Appointment } from "@/lib/types/database"
 import { formatCurrency, formatPhone } from "@/lib/utils"
@@ -237,7 +239,7 @@ export function AppointmentTooltip() {
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', marginBottom: '0.5rem' }}>
                       {client.photo_url && imgErrorClient !== client.id ? (
-                        <img
+                        <ExpandableImage
                           src={client.photo_url}
                           alt={client.name}
                           onError={() => setImgErrorClient(client.id)}

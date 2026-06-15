@@ -1,6 +1,7 @@
 "use client"
 import { useState, useEffect } from "react"
 import { X, Calendar, Clock, User, DollarSign, FileText, Loader2, AlertCircle } from "lucide-react"
+import { ExpandableImage } from "@/components/ui/expandable-image"
 import { fetchCollectionWhere } from "@/lib/firebase/client-utils"
 import type { Appointment, Client } from "@/lib/types/database"
 import { formatCurrency } from "@/lib/utils"
@@ -103,7 +104,7 @@ export function ClientHistoryModal({ client, onClose }: Props) {
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.875rem' }}>
               {client.photo_url && !imgError ? (
-                <img
+                <ExpandableImage
                   src={client.photo_url}
                   alt={client.name}
                   onError={() => setImgError(true)}

@@ -2,6 +2,7 @@
 
 import type { Employee } from "@/lib/types/database"
 import { User, ArrowRight, ArrowLeft, ChevronRight, Star, MessageCircle } from "lucide-react"
+import { ExpandableImage } from "@/components/ui/expandable-image"
 
 interface Props {
   employees: Employee[]
@@ -56,7 +57,7 @@ export function EmployeeSelection({ employees, selectedEmployee, companyWhatsapp
             return (
               <button key={emp.id} onClick={() => onSelect(emp)} style={cardStyle(sel)}>
                 {emp.photo_url ? (
-                  <img src={emp.photo_url} alt={emp.name} style={{ width: '48px', height: '48px', borderRadius: '0.625rem', objectFit: 'cover', flexShrink: 0 }} />
+                  <ExpandableImage src={emp.photo_url} alt={emp.name} style={{ width: '48px', height: '48px', borderRadius: '0.625rem', objectFit: 'cover', flexShrink: 0 }} />
                 ) : (
                   <div style={{ width: '48px', height: '48px', borderRadius: '0.625rem', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, #7c5cfc, #22c997)', color: '#fff', fontSize: '1rem', fontWeight: 700 }}>
                     {emp.name.charAt(0).toUpperCase()}

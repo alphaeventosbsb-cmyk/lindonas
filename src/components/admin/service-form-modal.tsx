@@ -6,6 +6,8 @@ import type { Service, Category, Product, ServiceProduct } from "@/lib/types/dat
 import { Loader2, X, Image as ImageIcon, Plus, Trash2, Tag, Percent, Scissors, CircleDollarSign, PackageSearch } from "lucide-react"
 import { toast } from "sonner"
 import { fetchCollectionWhere, fetchCollection } from "@/lib/firebase/client-utils"
+import { formatCurrency } from "@/lib/utils"
+import { ExpandableImage } from "@/components/ui/expandable-image"
 import { useTenant } from "@/lib/auth/tenant-context"
 
 interface ServiceFormModalProps {
@@ -257,7 +259,7 @@ export function ServiceFormModal({ service, categories, allServices, allProducts
                 <label style={labelStyle}>Foto do Serviço</label>
                 <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
                   <div style={{ width: '4.5rem', height: '4.5rem', borderRadius: '0.5rem', border: '2px dashed #cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', background: '#fff', flexShrink: 0 }}>
-                    {preview ? <img src={preview} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <ImageIcon style={{ width: '1.5rem', height: '1.5rem', color: '#94a3b8' }} />}
+                    {preview ? <ExpandableImage src={preview} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <ImageIcon style={{ width: '1.5rem', height: '1.5rem', color: '#94a3b8' }} />}
                   </div>
                   <div>
                     <input type="file" ref={fileInputRef} onChange={handlePhotoSelect} accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }} />

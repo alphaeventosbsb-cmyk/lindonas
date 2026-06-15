@@ -5,6 +5,7 @@ import { fetchCollection } from "@/lib/firebase/client-utils"
 import type { Client, ClientTransaction } from "@/lib/types/database"
 import { formatCurrency } from "@/lib/utils"
 import { Loader2, Search, Wallet, Plus, History, UserCheck, Minus } from "lucide-react"
+import { ExpandableImage } from "@/components/ui/expandable-image"
 import { ClientTransactionModal } from "@/components/admin/client-transaction-modal"
 import { useTenant } from "@/lib/auth/tenant-context"
 import { normalizeSearchText } from "@/lib/search"
@@ -157,7 +158,7 @@ export default function CreditoClientePage() {
                   <td style={{ padding: '1rem 1.25rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                       {client.photo_url ? (
-                        <img src={client.photo_url} alt={client.name} style={{ width: '2.5rem', height: '2.5rem', borderRadius: '0.75rem', objectFit: 'cover' }} />
+                        <ExpandableImage src={client.photo_url} alt={client.name} style={{ width: '2.5rem', height: '2.5rem', borderRadius: '0.75rem', objectFit: 'cover' }} />
                       ) : (
                         <div style={{ width: '2.5rem', height: '2.5rem', borderRadius: '0.75rem', background: 'linear-gradient(135deg, #7c5cfc, #a78bfa)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>
                           {client.name.charAt(0)}

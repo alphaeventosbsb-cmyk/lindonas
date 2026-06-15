@@ -6,6 +6,7 @@ import { uploadToCloudinary } from "@/lib/cloudinary"
 import type { Client, Appointment } from "@/lib/types/database"
 import { formatCurrency, formatPhone, formatCPF } from "@/lib/utils"
 import { Loader2, Plus, Pencil, Trash2, Search, UserCheck, AlertTriangle, Phone, Mail, DollarSign, Star, MapPin, LayoutGrid, List } from "lucide-react"
+import { ExpandableImage } from "@/components/ui/expandable-image"
 import { toast } from "sonner"
 import { useTenant } from "@/lib/auth/tenant-context"
 import { ClientFormModal } from "@/components/admin/client-form-modal"
@@ -254,7 +255,7 @@ export default function ClientesPage() {
                 >
                   {/* Avatar */}
                   {client.photo_url ? (
-                    <img src={client.photo_url} alt={client.name} style={{
+                    <ExpandableImage src={client.photo_url} alt={client.name} style={{
                       width: '2.75rem', height: '2.75rem', borderRadius: '0.625rem', objectFit: 'cover', flexShrink: 0,
                       boxShadow: '0 2px 6px rgba(0,0,0,0.1)', border: client.is_vip ? '2px solid #ffb547' : 'none'
                     }} />
@@ -390,7 +391,7 @@ export default function ClientesPage() {
                 <div style={{ padding: '1.25rem' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
                     {client.photo_url ? (
-                      <img src={client.photo_url} alt={client.name} style={{ width: '3.5rem', height: '3.5rem', borderRadius: '0.75rem', objectFit: 'cover', flexShrink: 0, boxShadow: '0 2px 6px rgba(0,0,0,0.1)', border: client.is_vip ? '2px solid #ffb547' : 'none' }} />
+                      <ExpandableImage src={client.photo_url} alt={client.name} style={{ width: '3.5rem', height: '3.5rem', borderRadius: '0.75rem', objectFit: 'cover', flexShrink: 0, boxShadow: '0 2px 6px rgba(0,0,0,0.1)', border: client.is_vip ? '2px solid #ffb547' : 'none' }} />
                     ) : (
                       <div style={{ width: '3.5rem', height: '3.5rem', borderRadius: '0.75rem', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: client.status === "debtor" ? 'linear-gradient(135deg, #f25c5c, #f78888)' : 'linear-gradient(135deg, #7c5cfc, #a78bfa)', color: '#fff', fontSize: '1.25rem', fontWeight: 800, boxShadow: '0 2px 6px rgba(0,0,0,0.1)', border: client.is_vip ? '2px solid #ffb547' : 'none' }}>
                         {client.name.charAt(0)}

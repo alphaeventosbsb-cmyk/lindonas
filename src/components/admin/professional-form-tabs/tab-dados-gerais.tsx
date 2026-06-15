@@ -1,6 +1,7 @@
 "use client"
 import { useState, useRef } from "react"
 import { Camera, X, Upload, AtSign, Globe, Link2, Play, CalendarCheck2 } from "lucide-react"
+import { ExpandableImage } from "@/components/ui/expandable-image"
 import type { Employee, EmployeeGender, EmployeeStatus, EmployeeSocialLinks } from "@/lib/types/database"
 
 const inputStyle: React.CSSProperties = {
@@ -145,7 +146,7 @@ export function TabDadosGerais({ form, onChange }: Props) {
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }} onClick={() => fileRef.current?.click()}>
             {photoSrc ? (
-              <img src={photoSrc} alt="Foto" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              <ExpandableImage src={photoSrc} alt="Foto" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             ) : (
               <span style={{ color: '#fff', fontSize: '1.75rem', fontWeight: 800 }}>{form.name?.charAt(0)?.toUpperCase() || '?'}</span>
             )}

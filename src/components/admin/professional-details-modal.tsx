@@ -1,6 +1,7 @@
 "use client"
 import { useState, useEffect } from "react"
 import { X, Phone, Mail, Clock, Calendar, Pencil, Trash2, AlertTriangle, Loader2, Percent, Briefcase, User, MapPin, AtSign, Globe } from "lucide-react"
+import { ExpandableImage } from "@/components/ui/expandable-image"
 import type { Employee } from "@/lib/types/database"
 import { formatPhone } from "@/lib/utils"
 
@@ -84,8 +85,9 @@ export function ProfessionalDetailsModal({ employee, index, onClose, onEdit, onD
             </button>
             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
               {employee.photo_url ? (
-                <img src={employee.photo_url} alt={employee.name} style={{
+                <ExpandableImage src={employee.photo_url} alt={employee.name} style={{
                   width: '3.5rem', height: '3.5rem', borderRadius: '1rem', objectFit: 'cover',
+
                   border: '3px solid rgba(255,255,255,0.3)',
                 }} />
               ) : (

@@ -2,7 +2,8 @@
 
 import { useState, useMemo } from "react"
 import type { Category, Service } from "@/lib/types/database"
-import { formatCurrency } from "@/lib/utils"
+import { formatCurrency, formatDuration } from "@/lib/utils"
+import { ExpandableImage } from "@/components/ui/expandable-image"
 import { Clock, ArrowRight, Search, Sparkles, ChevronDown } from "lucide-react"
 
 interface Props {
@@ -78,7 +79,7 @@ export function ServiceSelection({ categories, services, selectedService, select
             <button key={service.id} onClick={() => { const cat = categories.find(c => c.id === service.category_id) || null; onSelect(service, cat) }}
               style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem', borderRadius: '0.75rem', textAlign: 'left', cursor: 'pointer', transition: 'all 0.15s ease', width: '100%', minHeight: '80px', border: sel ? '2px solid #7c5cfc' : '2px solid #e8ecf4', background: sel ? '#f0ecff' : '#fff', boxShadow: sel ? '0 4px 16px rgba(124,92,252,0.12)' : '0 1px 3px rgba(0,0,0,0.03)' }}>
               {service.image_url ? (
-                <img src={service.image_url} alt={service.name} style={{ width: '64px', height: '64px', borderRadius: '0.5rem', objectFit: 'cover', flexShrink: 0 }} />
+                <ExpandableImage src={service.image_url} alt={service.name} style={{ width: '64px', height: '64px', borderRadius: '0.5rem', objectFit: 'cover', flexShrink: 0 }} />
               ) : (
                 <div style={{ width: '64px', height: '64px', borderRadius: '0.5rem', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, #7c5cfc, #a78bfa)', color: '#fff', fontSize: '1.375rem', fontWeight: 700 }}>
                   {service.name.charAt(0)}

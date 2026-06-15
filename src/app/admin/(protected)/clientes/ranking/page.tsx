@@ -5,6 +5,7 @@ import { fetchCollection } from "@/lib/firebase/client-utils"
 import type { Client, Appointment } from "@/lib/types/database"
 import { formatCurrency } from "@/lib/utils"
 import { Loader2, Trophy, ArrowUpRight, ArrowDownRight, Star, Calendar } from "lucide-react"
+import { ExpandableImage } from "@/components/ui/expandable-image"
 
 type Period = "all" | "today" | "week" | "month" | "year"
 type SortBy = "visits" | "revenue" | "ticket"
@@ -179,7 +180,7 @@ export default function RankingClientesPage() {
                 <td style={{ padding: '1rem 1.25rem' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                     {client.photo_url ? (
-                      <img src={client.photo_url} alt={client.name} style={{ width: '2rem', height: '2rem', borderRadius: '50%', objectFit: 'cover' }} />
+                      <ExpandableImage src={client.photo_url} alt={client.name} style={{ width: '2rem', height: '2rem', borderRadius: '50%', objectFit: 'cover' }} />
                     ) : (
                       <div style={{ width: '2rem', height: '2rem', borderRadius: '50%', background: '#e2e8f0', color: '#475569', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.875rem' }}>
                         {client.name.charAt(0)}

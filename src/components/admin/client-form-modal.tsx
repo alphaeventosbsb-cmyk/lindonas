@@ -1,6 +1,7 @@
 "use client"
 import { useState, useRef, useEffect } from "react"
 import { X, Camera, Upload, Star, Loader2 } from "lucide-react"
+import { ExpandableImage } from "@/components/ui/expandable-image"
 import type { Client, ClientGender, ClientMaritalStatus, ClientReferralSource, ClientAddress } from "@/lib/types/database"
 import { formatCPF, validateCPF, formatPhone, maskCEP } from "@/lib/utils"
 import { fetchCollectionWhere } from "@/lib/firebase/client-utils"
@@ -218,7 +219,7 @@ export function ClientFormModal({ client, onClose, onSave }: Props) {
           <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid #f1f3f9', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'linear-gradient(180deg, #faf8ff 0%, #fff 100%)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
               {photoSrc ? (
-                <img src={photoSrc} alt="" style={{ width: '2.75rem', height: '2.75rem', borderRadius: '0.75rem', objectFit: 'cover', border: '2px solid #e0d4ff' }} />
+                <ExpandableImage src={photoSrc} alt="" style={{ width: '2.75rem', height: '2.75rem', borderRadius: '0.75rem', objectFit: 'cover', border: '2px solid #e0d4ff' }} />
               ) : (
                 <div style={{ width: '2.75rem', height: '2.75rem', borderRadius: '0.75rem', background: 'linear-gradient(135deg, #7c5cfc, #a78bfa)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '1rem', fontWeight: 800 }}>
                   {name ? name.charAt(0).toUpperCase() : '?'}
@@ -261,7 +262,7 @@ export function ClientFormModal({ client, onClose, onSave }: Props) {
                   <div style={{ padding: '1.25rem', background: '#fff', border: '1px solid #e8ecf4', borderRadius: '1rem', marginBottom: '0.25rem', display: 'flex', flexDirection: 'column', gap: '1rem', boxShadow: '0 2px 10px rgba(0,0,0,0.02)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                       {photoSrc ? (
-                        <img src={photoSrc} alt="" style={{ width: '3.5rem', height: '3.5rem', borderRadius: '50%', objectFit: 'cover', background: '#f1f3f9' }} />
+                        <ExpandableImage src={photoSrc} alt="" style={{ width: '3.5rem', height: '3.5rem', borderRadius: '50%', objectFit: 'cover', background: '#f1f3f9' }} />
                       ) : (
                         <div style={{ width: '3.5rem', height: '3.5rem', borderRadius: '50%', background: '#f1f3f9', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9ca3af', fontSize: '1.25rem', fontWeight: 700 }}>
                           {client.name ? client.name.charAt(0).toUpperCase() : '?'}
@@ -293,7 +294,7 @@ export function ClientFormModal({ client, onClose, onSave }: Props) {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.25rem' }}>
                   <div style={{ position: 'relative' }}>
                     {photoSrc ? (
-                      <img src={photoSrc} alt="" style={{ width: '4rem', height: '4rem', borderRadius: '1rem', objectFit: 'cover', border: '2px solid #e0d4ff' }} />
+                      <ExpandableImage src={photoSrc} alt="" style={{ width: '4rem', height: '4rem', borderRadius: '1rem', objectFit: 'cover', border: '2px solid #e0d4ff' }} />
                     ) : (
                       <div style={{ width: '4rem', height: '4rem', borderRadius: '1rem', background: '#f1f3f9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         <Camera style={{ width: '1.25rem', height: '1.25rem', color: '#8b8fa7' }} />

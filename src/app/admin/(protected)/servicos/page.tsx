@@ -7,6 +7,7 @@ import type { Service, Category, ServiceProduct } from "@/lib/types/database"
 import { formatCurrency, formatDuration } from "@/lib/utils"
 import { normalizeSearchText } from "@/lib/search"
 import { Loader2, Plus, Pencil, Trash2, X, Clock, Search, Scissors, Filter, ChevronRight, Tag, ChevronDown, ChevronUp, CheckSquare, LayoutGrid, List, EyeOff } from "lucide-react"
+import { ExpandableImage } from "@/components/ui/expandable-image"
 import { toast } from "sonner"
 import { useConfirm } from "@/components/ui/confirm-modal"
 import { ServiceFormModal } from "@/components/admin/service-form-modal"
@@ -439,7 +440,7 @@ export default function ServicosPage() {
                   overflow: 'hidden'
                 }}>
                   {s.image_url ? (
-                    <img src={s.image_url} alt={s.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <ExpandableImage src={s.image_url} alt={s.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   ) : (
                     <Scissors style={{ width: '14px', height: '14px' }} />
                   )}

@@ -5,6 +5,7 @@ import { fetchCollection, createDocument, updateDocument, deleteDocument } from 
 import { uploadToCloudinary } from "@/lib/cloudinary"
 import type { Employee, EmployeeStatus, BusinessSettings, Category, Service } from "@/lib/types/database"
 import { Loader2, Plus, Pencil, Trash2, Search, Users, ChevronRight, CheckSquare, LayoutGrid, List, Filter } from "lucide-react"
+import { ExpandableImage } from "@/components/ui/expandable-image"
 import { toast } from "sonner"
 import { useConfirm } from "@/components/ui/confirm-modal"
 import { ProfessionalDetailsModal } from "@/components/admin/professional-details-modal"
@@ -460,7 +461,7 @@ export default function ProfissionaisPage() {
 
                 {/* Avatar */}
                 {emp.photo_url ? (
-                  <img src={emp.photo_url} alt={emp.name} style={{
+                  <ExpandableImage src={emp.photo_url} alt={emp.name} style={{
                     width: '2.25rem', height: '2.25rem', borderRadius: '0.625rem', objectFit: 'cover', flexShrink: 0,
                     boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
                   }} />
@@ -595,7 +596,7 @@ export default function ProfissionaisPage() {
                 <div style={{ padding: '1.25rem' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
                     {emp.photo_url ? (
-                      <img src={emp.photo_url} alt={emp.name} style={{ width: '3rem', height: '3rem', borderRadius: '0.75rem', objectFit: 'cover', flexShrink: 0, boxShadow: '0 2px 6px rgba(0,0,0,0.1)' }} />
+                      <ExpandableImage src={emp.photo_url} alt={emp.name} style={{ width: '3rem', height: '3rem', borderRadius: '0.75rem', objectFit: 'cover', flexShrink: 0, boxShadow: '0 2px 6px rgba(0,0,0,0.1)' }} />
                     ) : (
                       <div style={{ width: '3rem', height: '3rem', borderRadius: '0.75rem', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: gradient, color: '#fff', fontSize: '1.125rem', fontWeight: 800, boxShadow: '0 2px 6px rgba(0,0,0,0.1)' }}>
                         {emp.name.charAt(0)}

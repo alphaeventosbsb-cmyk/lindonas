@@ -119,6 +119,75 @@ export default function ClientesPage() {
     } catch { toast.error("Erro ao excluir cliente") }
   }
 
+  const handleImportConfirm = async (importedClients: Record<string, unknown>[], mappedKeys: string[], columnMapping: Record<string, string>) => {
+    if (!canCreate) {
+      toast.error('Sem permissão para importar clientes')
+      return
+    }
+
+    const toCreate = importedClients.filter(c => c._status === "valid")
+    if (toCreate.length === 0) return
+
+    let createdCount = 0
+    let errorCount = 0
+
+    for (const row of toCreate) {
+      try {
+        const nameCol = Object.keys(columnMapping).find(k => columnMapping[k] === "name")
+        const phoneCol = Object.keys(columnMapping).find(k => columnMapping[k] === "phone")
+        const emailCol = Object.keys(columnMapping).find(k => columnMapping[k] === "email")
+        const cpfCol = Object.keys(columnMapping).find(k => columnMapping[k] === "cpf")
+        const addressCol = Object.keys(columnMapping).find(k => columnMapping[k] === "address")
+        const birthCol = Object.keys(columnMapping).find(k => columnMapping[k] === "birth_date")
+        const notesCol = Object.keys(columnMapping).find(k => columnMapping[k] === "notes")
+
+        const name = nameCol ? String(row[nameCol] || "").trim() : ""
+        const phone = phoneCol ? String(row[phoneCol] || "").replace(/\D/g, "") : ""
+        const email = emailCol ? String(row[emailCol] || "").trim().toLowerCase() : ""
+        const cpf = cpfCol ? String(row[cpfCol] || "").replace(/\D/g, "") : ""
+        const addressText = addressCol ? String(row[addressCol] || "").trim() : ""
+        const birthDateStr = birthCol ? String(row[birthCol] || "").trim() : ""
+        const notesText = notesCol ? String(row[notesCol] || "").trim() : ""
+
+        let birthDate = null
+        if (birthDateStr) {
+          if (birthDateStr.includes("/")) {
+            const parts = birthDateStr.split("/")
+            if (parts.length === 3) birthDate = `${parts[2]}-${parts[1]}-${parts[0]}`
+          } else if (birthDateStr.includes("-")) {
+            birthDate = birthDateStr
+          }
+        }
+
+        const dataToSave: Record<string, unknown> = {
+          name: name,
+          phone: phone || null,
+          email: email || null,
+          cpf: (cpf && cpf.length === 11) ? cpf : null,
+          birth_date: birthDate || null,
+          notes: notesText || null,
+          status: "active",
+          debt_amount: 0,
+          total_spent: 0,
+          appointment_count: 0,
+          last_visit: null,
+          is_vip: false,
+          online_booking_blocked: false,
+          address: addressText ? { street: addressText } : null
+        }
+
+        await createDocument("clients", dataToSave)
+        createdCount++
+      } catch (err) {
+        console.error("Erro ao importar cliente", row, err)
+        errorCount++
+      }
+    }
+
+    toast.success(`Importação concluída! ${createdCount} criados, ${errorCount} falhas.`)
+    load()
+  }
+
   const getClientAppointments = (clientName: string) => {
     return appointments.filter(a => a.client_name.toLowerCase() === clientName.toLowerCase())
   }
@@ -210,6 +279,8 @@ export default function ClientesPage() {
           fileName={`clientes-${new Date().toISOString().split('T')[0]}`}
           title="Relatório de Clientes"
           importModule="clientes"
+          fullData={clients}
+          onImportConfirm={handleImportConfirm}
         />
         <div style={{ display: 'flex', gap: '0.375rem', background: '#f8fafc', padding: '0.25rem', borderRadius: '0.5rem', border: '1px solid #e2e8f0', marginLeft: 'auto' }}>
           <button 

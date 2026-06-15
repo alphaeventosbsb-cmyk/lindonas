@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useRef } from "react"
-import { UploadCloud, X, FileSpreadsheet, Loader2, AlertCircle } from "lucide-react"
+import { useState, useRef, useMemo } from "react"
+import { X, Upload, File as FileIcon, AlertCircle, Loader2, ChevronDown, FileSpreadsheet } from "lucide-react"
 import { parseImportFile, validateImportRows, mapImportColumns } from "@/lib/export-utils"
 
 interface ImportPreviewModalProps {
@@ -29,9 +29,7 @@ export function ImportPreviewModal({ moduleType, onClose, fullData, onConfirm }:
   const [error, setError] = useState<string | null>(null)
   
   const [file, setFile] = useState<File | null>(null)
-  const [previewData, setPreviewData] = useState<Record<string, unknown>[]>([])
-  const [processedData, setProcessedData] = useState<Record<string, unknown>[]>([])
-  const [importSummary, setImportSummary] = useState({ total: 0, valid: 0, duplicate: 0, error: 0, warning: 0, toCreate: 0 })
+  const [rawValidData, setRawValidData] = useState<Record<string, unknown>[]>([])
   const [mappedKeys, setMappedKeys] = useState<string[]>([])
   const [columnMapping, setColumnMapping] = useState<Record<string, string>>({})
 
@@ -88,112 +86,19 @@ export function ImportPreviewModal({ moduleType, onClose, fullData, onConfirm }:
       }
 
       const previewInitial = valid.slice(0, 10) as Record<string, unknown>[]
-      
-      // Extract all keys from the first few rows
       const allKeys = new Set<string>()
       previewInitial.forEach(row => Object.keys(row).forEach(k => allKeys.add(k)))
       const keysArray = Array.from(allKeys)
       
-      // Try to heuristically map
       let autoMap = {}
       if (previewInitial.length > 0) {
         autoMap = mapImportColumns(previewInitial[0], moduleType)
       }
 
-      const seenCpfs = new Set<string>()
-      const seenEmails = new Set<string>()
-      const seenPhones = new Set<string>()
-
-      const processed = valid.map((row: Record<string, unknown>) => {
-        let isDuplicate = false
-        let isError = false
-        let isWarning = false
-        let errorMsg = ""
-        let generatedName = ""
-        let generatedNotes = ""
-        
-        if (moduleType === "clientes") {
-          const nameCol = Object.keys(autoMap).find(k => (autoMap as Record<string, string>)[k] === "name")
-          const phoneCol = Object.keys(autoMap).find(k => (autoMap as Record<string, string>)[k] === "phone")
-          const emailCol = Object.keys(autoMap).find(k => (autoMap as Record<string, string>)[k] === "email")
-          const cpfCol = Object.keys(autoMap).find(k => (autoMap as Record<string, string>)[k] === "cpf")
-
-          const nameVal = nameCol ? String(row[nameCol] || "").trim() : ""
-          const phoneVal = phoneCol ? String(row[phoneCol] || "").replace(/\D/g, "") : ""
-          const emailVal = emailCol ? String(row[emailCol] || "").trim().toLowerCase() : ""
-          const cpfVal = cpfCol ? String(row[cpfCol] || "").replace(/\D/g, "") : ""
-
-          if (!nameVal) {
-            if (phoneVal || emailVal || cpfVal) {
-              isWarning = true
-              if (phoneVal) generatedName = `Cliente sem nome - ${phoneVal}`
-              else if (emailVal) generatedName = `Cliente sem nome - ${emailVal}`
-              else generatedName = `Cliente sem nome - CPF ${cpfVal}`
-              
-              generatedNotes = "Importado com nome vazio. Revisar cadastro manualmente."
-            } else {
-              isError = true
-              errorMsg = "linha sem dados suficientes"
-            }
-          }
-
-          if (!isError) {
-            // Check internal spreadsheet duplication
-            let internalDup = false
-            if (cpfVal && cpfVal.length === 11) {
-              if (seenCpfs.has(cpfVal)) internalDup = true; else seenCpfs.add(cpfVal);
-            }
-            if (emailVal) {
-              if (seenEmails.has(emailVal)) internalDup = true; else seenEmails.add(emailVal);
-            }
-            if (phoneVal && phoneVal.length >= 10) {
-              if (seenPhones.has(phoneVal)) internalDup = true; else seenPhones.add(phoneVal);
-            }
-
-            if (internalDup) {
-              isDuplicate = true
-            } else if (fullData && fullData.length > 0) {
-              // Check existing database duplication
-              isDuplicate = fullData.some(existing => {
-                if (cpfVal && cpfVal.length === 11 && String(existing.cpf) === cpfVal) return true
-                if (emailVal && String(existing.email || "").toLowerCase() === emailVal) return true
-                if (phoneVal && phoneVal.length >= 10 && String(existing.phone || "") === phoneVal) return true
-                if (nameVal && phoneVal && String(existing.name || "").toLowerCase() === nameVal.toLowerCase() && String(existing.phone || "") === phoneVal) return true
-                return false
-              })
-            }
-          }
-        }
-        
-        return {
-          ...row,
-          _status: isError ? "error" : isDuplicate ? "duplicate" : isWarning ? "warning" : "valid",
-          _errorMsg: errorMsg,
-          _generatedName: generatedName,
-          _generatedNotes: generatedNotes
-        }
-      })
-
-      const toCreate = processed.filter(r => r._status === "valid" || r._status === "warning").length
-      const errorCnt = processed.filter(r => r._status === "error").length
-      const dupCnt = processed.filter(r => r._status === "duplicate").length
-      const warningCnt = processed.filter(r => r._status === "warning").length
-
-      setImportSummary({
-        total: processed.length,
-        valid: toCreate + dupCnt,
-        error: errorCnt,
-        duplicate: dupCnt,
-        warning: warningCnt,
-        toCreate: toCreate
-      })
-
+      setRawValidData(valid as Record<string, unknown>[])
       setFile(selectedFile)
-      setProcessedData(processed)
-      setPreviewData(processed.slice(0, 10))
       setMappedKeys(keysArray)
       setColumnMapping(autoMap)
-
     } catch (err) {
       setError("Erro ao ler o arquivo. Certifique-se que ele não está corrompido.")
       console.error(err)
@@ -202,10 +107,102 @@ export function ImportPreviewModal({ moduleType, onClose, fullData, onConfirm }:
     }
   }
 
+  const processedData = useMemo(() => {
+    if (rawValidData.length === 0) return []
+
+    const seenCpfs = new Set<string>()
+    const seenEmails = new Set<string>()
+    const seenPhones = new Set<string>()
+
+    return rawValidData.map((row: Record<string, unknown>) => {
+      let isDuplicate = false
+      let isError = false
+      let isWarning = false
+      let errorMsg = ""
+      let generatedName = ""
+      let generatedNotes = ""
+      
+      if (moduleType === "clientes") {
+        const nameCol = Object.keys(columnMapping).find(k => columnMapping[k] === "name")
+        const phoneCol = Object.keys(columnMapping).find(k => columnMapping[k] === "phone")
+        const emailCol = Object.keys(columnMapping).find(k => columnMapping[k] === "email")
+        const cpfCol = Object.keys(columnMapping).find(k => columnMapping[k] === "cpf")
+
+        const nameVal = nameCol ? String(row[nameCol] || "").trim() : ""
+        const phoneVal = phoneCol ? String(row[phoneCol] || "").replace(/\D/g, "") : ""
+        const emailVal = emailCol ? String(row[emailCol] || "").trim().toLowerCase() : ""
+        const cpfVal = cpfCol ? String(row[cpfCol] || "").replace(/\D/g, "") : ""
+
+        if (!nameVal) {
+          if (phoneVal || emailVal || cpfVal) {
+            isWarning = true
+            if (phoneVal) generatedName = `Cliente sem nome - ${phoneVal}`
+            else if (emailVal) generatedName = `Cliente sem nome - ${emailVal}`
+            else generatedName = `Cliente sem nome - CPF ${cpfVal}`
+            generatedNotes = "Importado com nome vazio. Revisar cadastro manualmente."
+          } else {
+            isError = true
+            errorMsg = "linha sem dados suficientes"
+          }
+        }
+
+        if (!isError) {
+          let internalDup = false
+          if (cpfVal && cpfVal.length === 11) {
+            if (seenCpfs.has(cpfVal)) internalDup = true; else seenCpfs.add(cpfVal);
+          }
+          if (emailVal) {
+            if (seenEmails.has(emailVal)) internalDup = true; else seenEmails.add(emailVal);
+          }
+          if (phoneVal && phoneVal.length >= 10) {
+            if (seenPhones.has(phoneVal)) internalDup = true; else seenPhones.add(phoneVal);
+          }
+
+          if (internalDup) {
+            isDuplicate = true
+          } else if (fullData && fullData.length > 0) {
+            isDuplicate = fullData.some(existing => {
+              if (cpfVal && cpfVal.length === 11 && String(existing.cpf) === cpfVal) return true
+              if (emailVal && String(existing.email || "").toLowerCase() === emailVal) return true
+              if (phoneVal && phoneVal.length >= 10 && String(existing.phone || "") === phoneVal) return true
+              if (nameVal && phoneVal && String(existing.name || "").toLowerCase() === nameVal.toLowerCase() && String(existing.phone || "") === phoneVal) return true
+              return false
+            })
+          }
+        }
+      }
+      
+      return {
+        ...row,
+        _status: isError ? "error" : isDuplicate ? "duplicate" : isWarning ? "warning" : "valid",
+        _errorMsg: errorMsg,
+        _generatedName: generatedName,
+        _generatedNotes: generatedNotes
+      }
+    })
+  }, [rawValidData, columnMapping, fullData, moduleType])
+
+  const previewData = useMemo(() => processedData.slice(0, 10), [processedData])
+
+  const importSummary = useMemo(() => {
+    const toCreate = processedData.filter(r => r._status === "valid" || r._status === "warning").length
+    const errorCnt = processedData.filter(r => r._status === "error").length
+    const dupCnt = processedData.filter(r => r._status === "duplicate").length
+    const warningCnt = processedData.filter(r => r._status === "warning").length
+
+    return {
+      total: processedData.length,
+      valid: toCreate + dupCnt,
+      error: errorCnt,
+      duplicate: dupCnt,
+      warning: warningCnt,
+      toCreate: toCreate
+    }
+  }, [processedData])
+
   const resetFile = () => {
     setFile(null)
-    setPreviewData([])
-    setProcessedData([])
+    setRawValidData([])
     setMappedKeys([])
     setColumnMapping({})
     setError(null)
@@ -215,7 +212,6 @@ export function ImportPreviewModal({ moduleType, onClose, fullData, onConfirm }:
   const handleConfirmAction = async () => {
     if (!onConfirm || moduleType !== "clientes") return
     if (!window.confirm("Tem certeza que deseja importar estes clientes? Apenas os clientes com status 'Válido' serão criados no banco.")) return
-    
     setSaving(true)
     try {
       await onConfirm(processedData, mappedKeys, columnMapping)
@@ -236,7 +232,6 @@ export function ImportPreviewModal({ moduleType, onClose, fullData, onConfirm }:
   return (
     <div style={overlayStyle} onClick={onClose}>
       <div style={modalStyle} onClick={e => e.stopPropagation()}>
-        {/* Header */}
         <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid #e8ecf4', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <h2 style={{ fontSize: '1.125rem', fontWeight: 700, color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <FileSpreadsheet style={{ width: '20px', height: '20px', color: '#0891b2' }} />
@@ -247,8 +242,7 @@ export function ImportPreviewModal({ moduleType, onClose, fullData, onConfirm }:
           </button>
         </div>
 
-        {/* Content */}
-        <div style={{ padding: '1.5rem', overflowY: 'auto' }}>
+        <div style={{ padding: '1.5rem', flex: 1, overflowY: 'auto' }}>
           {error && (
             <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '0.75rem', padding: '1rem', display: 'flex', gap: '0.75rem', marginBottom: '1.5rem' }}>
               <AlertCircle style={{ width: '20px', height: '20px', color: '#ef4444', flexShrink: 0 }} />
@@ -259,46 +253,100 @@ export function ImportPreviewModal({ moduleType, onClose, fullData, onConfirm }:
             </div>
           )}
 
-          {!file ? (
+          {!file && !loading ? (
             <div 
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
-              onClick={() => fileInputRef.current?.click()}
               style={{
-                border: isDragging ? '2px dashed #0891b2' : '2px dashed #cbd5e1',
-                background: isDragging ? '#f0fdfa' : '#f8fafc',
-                borderRadius: '1rem', padding: '3rem 2rem', textAlign: 'center',
-                cursor: 'pointer', transition: 'all 0.2s',
+                border: `2px dashed ${isDragging ? '#7c5cfc' : '#cbd5e1'}`,
+                background: isDragging ? '#f5f3ff' : '#f8fafc',
+                borderRadius: '0.75rem',
+                padding: '3rem 2rem',
+                textAlign: 'center',
+                transition: 'all 0.2s ease',
+                cursor: 'pointer'
               }}
+              onClick={() => fileInputRef.current?.click()}
             >
-              <UploadCloud style={{ width: '3rem', height: '3rem', color: isDragging ? '#0891b2' : '#94a3b8', margin: '0 auto 1rem' }} />
-              <p style={{ margin: '0 0 0.5rem', fontSize: '1rem', fontWeight: 600, color: '#334155' }}>
-                Arraste uma planilha ou clique para selecionar
-              </p>
+              <Upload style={{ width: '40px', height: '40px', margin: '0 auto 1rem', color: isDragging ? '#7c5cfc' : '#94a3b8' }} />
+              <h3 style={{ margin: '0 0 0.5rem', fontSize: '1.125rem', fontWeight: 600, color: '#1e293b' }}>
+                Clique ou arraste a planilha
+              </h3>
               <p style={{ margin: 0, fontSize: '0.875rem', color: '#64748b' }}>
-                Formatos suportados: .xlsx, .xls, .csv
+                Aceita arquivos Excel (.xlsx, .xls) e CSV (.csv). Máximo de 5MB.
               </p>
               <input 
                 type="file" 
                 ref={fileInputRef} 
-                onChange={handleFileSelect} 
-                accept=".xlsx, .xls, .csv" 
                 style={{ display: 'none' }} 
+                accept=".xlsx, .xls, .csv" 
+                onChange={handleFileSelect}
               />
-              
-              {loading && (
-                <div style={{ marginTop: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', color: '#0891b2' }}>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  <span style={{ fontSize: '0.875rem', fontWeight: 500 }}>Lendo arquivo...</span>
-                </div>
-              )}
+            </div>
+          ) : loading ? (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '3rem 0' }}>
+              <Loader2 className="w-10 h-10 animate-spin text-purple-600 mb-4" />
+              <p style={{ margin: 0, color: '#475569', fontWeight: 500 }}>Processando arquivo...</p>
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              {moduleType === "clientes" && mappedKeys.length > 0 && (
+                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '0.5rem', padding: '1rem' }}>
+                  <h4 style={{ margin: '0 0 0.75rem', fontSize: '0.875rem', fontWeight: 600, color: '#334155' }}>Mapeamento de Colunas</h4>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem' }}>
+                    {['name', 'phone', 'email', 'cpf'].map(field => {
+                      const labelMap: Record<string, string> = { name: "Nome", phone: "Telefone", email: "E-mail", cpf: "CPF" }
+                      const currentMappedCol = Object.keys(columnMapping).find(k => columnMapping[k] === field) || ""
+                      
+                      let exampleStr = ""
+                      if (currentMappedCol && rawValidData.length > 0) {
+                        const rowWithVal = rawValidData.find(r => r[currentMappedCol] !== undefined && r[currentMappedCol] !== null && String(r[currentMappedCol]).trim() !== "")
+                        if (rowWithVal) {
+                          const val = rowWithVal[currentMappedCol]
+                          exampleStr = String(val).length > 25 ? String(val).substring(0, 25) + "..." : String(val)
+                        }
+                      }
+
+                      return (
+                        <div key={field} style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                          <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b' }}>Coluna para {labelMap[field]}</label>
+                          <div style={{ position: 'relative' }}>
+                            <select 
+                              value={currentMappedCol}
+                              onChange={(e) => {
+                                const val = e.target.value
+                                setColumnMapping(prev => {
+                                  const next = { ...prev }
+                                  Object.keys(next).forEach(k => { if (next[k] === field) delete next[k] })
+                                  if (val !== "") next[val] = field
+                                  return next
+                                })
+                              }}
+                              style={{ width: '100%', padding: '0.5rem 2rem 0.5rem 0.75rem', fontSize: '0.875rem', borderRadius: '0.375rem', border: '1px solid #cbd5e1', background: '#fff', appearance: 'none', outline: 'none' }}
+                            >
+                              <option value="">-- Nenhuma --</option>
+                              {mappedKeys.map(k => (
+                                <option key={k} value={k}>{k}</option>
+                              ))}
+                            </select>
+                            <ChevronDown style={{ position: 'absolute', right: '0.5rem', top: '50%', transform: 'translateY(-50%)', width: '16px', height: '16px', color: '#94a3b8', pointerEvents: 'none' }} />
+                          </div>
+                          {exampleStr && (
+                            <span style={{ fontSize: '0.6875rem', color: '#94a3b8', marginTop: '0.125rem' }}>
+                              Ex: {exampleStr}
+                            </span>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+              
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#f8fafc', padding: '1rem', borderRadius: '0.75rem', border: '1px solid #e2e8f0' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                  <FileSpreadsheet style={{ width: '24px', height: '24px', color: '#10b981' }} />
+                  <FileIcon style={{ width: '24px', height: '24px', color: '#10b981' }} />
                   <div>
                     <p style={{ margin: 0, fontSize: '0.875rem', fontWeight: 600, color: '#1e293b' }}>{file.name}</p>
                     <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b' }}>Linhas lidas: {previewData.length} (exibindo prévia)</p>

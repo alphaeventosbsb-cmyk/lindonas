@@ -62,9 +62,19 @@ export function ClientHistoryModal({ client, onClose }: Props) {
     }
   })
 
-  const ticketMedio = uniqueAttendancesCount > 0 ? totalSpent / uniqueAttendancesCount : 0
   const lastVisit = validAttendances.length > 0 ? validAttendances[0].appointment_date : null
   const firstVisit = validAttendances.length > 0 ? validAttendances[validAttendances.length - 1].appointment_date : null
+
+  const MONTHS_SHORT = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez']
+  const fmtDate = (dateStr: string | null | undefined) => {
+    if (!dateStr) return null
+    const d = dateStr.split('T')[0]
+    const parts = d.split('-')
+    if (parts.length < 3) return d
+    return `${parseInt(parts[2])} ${MONTHS_SHORT[parseInt(parts[1]) - 1]} ${parts[0]}`
+  }
+  const clientSinceRaw = client.created_at || firstVisit
+  const clientSince = fmtDate(clientSinceRaw) || 'Não informado'
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(4px)', padding: '1rem' }}>
@@ -91,7 +101,7 @@ export function ClientHistoryModal({ client, onClose }: Props) {
             padding: '1rem', borderRadius: '0.75rem',
             background: '#fafbfc', border: '1px solid #e8ecf4',
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.875rem', marginBottom: '0.75rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.875rem' }}>
               {client.photo_url && !imgError ? (
                 <img
                   src={client.photo_url}
@@ -132,30 +142,6 @@ export function ClientHistoryModal({ client, onClose }: Props) {
                 </p>
               </div>
             </div>
-            <div style={{
-              display: 'flex', gap: '1rem', borderTop: '1px solid #e8ecf4', paddingTop: '0.75rem',
-            }}>
-              {(() => {
-                const MONTHS_SHORT = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez']
-                const fmtDate = (dateStr: string | null | undefined) => {
-                  if (!dateStr) return null
-                  const d = dateStr.split('T')[0]
-                  const parts = d.split('-')
-                  if (parts.length < 3) return d
-                  return `${parseInt(parts[2])} ${MONTHS_SHORT[parseInt(parts[1]) - 1]} ${parts[0]}`
-                }
-                const clientSinceRaw = client.created_at || firstVisit
-                const clientSince = fmtDate(clientSinceRaw) || 'Não informado'
-                return (
-                  <>
-                    <div style={{ flex: 1 }}>
-                      <p style={{ fontSize: '0.6875rem', color: '#94a3b8', fontWeight: 600, marginBottom: '0.125rem' }}>Cliente desde</p>
-                      <p style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#0f172a' }}>{clientSince}</p>
-                    </div>
-                  </>
-                )
-              })()}
-            </div>
           </div>
         </div>
 
@@ -170,8 +156,8 @@ export function ClientHistoryModal({ client, onClose }: Props) {
             <p style={{ fontSize: '1.25rem', fontWeight: 800, color: '#15803d' }}>{formatCurrency(totalSpent)}</p>
           </div>
           <div style={{ padding: '1rem', background: '#fefce8', borderRadius: '0.75rem', border: '1px solid #fef08a' }}>
-            <p style={{ fontSize: '0.6875rem', fontWeight: 700, color: '#854d0e', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Ticket Médio</p>
-            <p style={{ fontSize: '1.25rem', fontWeight: 800, color: '#a16207' }}>{formatCurrency(ticketMedio)}</p>
+            <p style={{ fontSize: '0.6875rem', fontWeight: 700, color: '#854d0e', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Cliente Desde</p>
+            <p style={{ fontSize: '1.25rem', fontWeight: 800, color: '#a16207' }}>{clientSince}</p>
           </div>
           <div style={{ padding: '1rem', background: '#eff6ff', borderRadius: '0.75rem', border: '1px solid #bfdbfe' }}>
             <p style={{ fontSize: '0.6875rem', fontWeight: 700, color: '#1e40af', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Última Visita</p>

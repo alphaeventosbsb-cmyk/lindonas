@@ -16,9 +16,10 @@ interface ExportButtonsProps<T> {
   fullData?: T[]
   extraData?: Record<string, unknown>
   onImportConfirm?: (data: Record<string, unknown>[], mappedKeys: string[], columnMapping: Record<string, string>) => Promise<void>
+  hideImport?: boolean
 }
 
-export function ExportButtons<T>({ data, columns, fileName, title, disabled = false, importModule, fullData, extraData, onImportConfirm }: ExportButtonsProps<T>) {
+export function ExportButtons<T>({ data, columns, fileName, title, disabled = false, importModule, fullData, extraData, onImportConfirm, hideImport = false }: ExportButtonsProps<T>) {
   const [exportingExcel, setExportingExcel] = useState(false)
   const [exportingPDF, setExportingPDF] = useState(false)
   const [showImportModal, setShowImportModal] = useState(false)
@@ -65,21 +66,23 @@ export function ExportButtons<T>({ data, columns, fileName, title, disabled = fa
 
   return (
     <div style={{ display: 'flex', gap: '0.375rem' }}>
-      <button
-        type="button"
-        onClick={handleImportClick}
-        disabled={disabled}
-        title="Importar (Em breve)"
-        style={{
-          display: 'flex', alignItems: 'center', gap: '0.375rem', padding: '0.5rem 0.75rem',
-          borderRadius: '0.5rem', border: '1px solid #e2e8f0', background: '#f8fafc',
-          color: '#64748b', fontSize: '0.75rem', fontWeight: 600, cursor: disabled ? 'not-allowed' : 'pointer',
-          transition: 'all 0.15s'
-        }}
-      >
-        <Upload style={{ width: '14px', height: '14px' }} />
-        <span className="hidden sm:inline">Importar</span>
-      </button>
+      {!hideImport && (
+        <button
+          type="button"
+          onClick={handleImportClick}
+          disabled={disabled}
+          title="Importar (Em breve)"
+          style={{
+            display: 'flex', alignItems: 'center', gap: '0.375rem', padding: '0.5rem 0.75rem',
+            borderRadius: '0.5rem', border: '1px solid #e2e8f0', background: '#f8fafc',
+            color: '#64748b', fontSize: '0.75rem', fontWeight: 600, cursor: disabled ? 'not-allowed' : 'pointer',
+            transition: 'all 0.15s'
+          }}
+        >
+          <Upload style={{ width: '14px', height: '14px' }} />
+          <span className="hidden sm:inline">Importar</span>
+        </button>
+      )}
 
       <button
         type="button"

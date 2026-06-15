@@ -12,7 +12,7 @@ import { DailyFinancialModal } from "@/components/admin/relatorios/daily-financi
 import { ExportButtons } from "@/components/ui/export-buttons"
 
 const inputStyle: React.CSSProperties = { padding: '0.75rem 1rem', borderRadius: '0.75rem', border: '2px solid #e2e8f0', backgroundColor: '#fff', color: '#1e1e2d', fontSize: '0.875rem', fontWeight: 500, outline: 'none' }
-type ReportTab = "revenue" | "clients" | "professionals" | "payments" | "services"
+type ReportTab = "daily" | "revenue" | "clients" | "professionals" | "payments" | "services"
 const paymentLabels: Record<string, string> = { cash: "Dinheiro", pix: "PIX", credit_card: "Crédito", debit_card: "Débito" }
 const PIE_COLORS = ["#7c5cfc","#22c997","#5b8def","#ffb547","#f25c5c","#a78bfa"]
 
@@ -26,6 +26,7 @@ export default function RelatoriosPage() {
   const { can } = usePermission()
   
   const availableTabs = [
+    ...(can("reports.financial") ? [{ id: "daily" as ReportTab, label: "Histórico Diário", icon: CalendarDays }] : []),
     ...(can("reports.finance") ? [{ id: "revenue" as ReportTab, label: "Receita", icon: TrendingUp }] : []),
     ...(can("reports.clients") ? [{ id: "clients" as ReportTab, label: "Clientes", icon: Users }] : []),
     ...(can("reports.professionals") ? [{ id: "professionals" as ReportTab, label: "Profissionais", icon: Users }] : []),
@@ -110,6 +111,18 @@ export default function RelatoriosPage() {
 
   const getActiveTabExportData = () => {
     switch (activeTab) {
+      case "daily":
+        return {
+          title: `Histórico Diário - ${periodStart} a ${periodEnd}`,
+          fileName: `historico_diario_${periodStart}_${periodEnd}`,
+          data: dailyReport,
+          columns: [
+            { header: "Data", key: "date", format: (v: any) => String(v).split('-').reverse().join('/') },
+            { header: "Entradas", key: "income", format: (v: any) => formatCurrency(Number(v)) },
+            { header: "Saídas", key: "expense", format: (v: any) => formatCurrency(Number(v)) },
+            { header: "Saldo", key: "balance", format: (v: any, row: any) => formatCurrency((row.income || 0) - (row.expense || 0)) }
+          ]
+        }
       case "revenue":
         return {
           title: `Receita por Pagamento - ${periodStart} a ${periodEnd}`,
@@ -171,18 +184,6 @@ export default function RelatoriosPage() {
   }
 
   const exportConfig = getActiveTabExportData()
-
-  const dailyLedgerExportConfig = {
-    title: `Histórico Diário - ${periodStart} a ${periodEnd}`,
-    fileName: `historico_diario_${periodStart}_${periodEnd}`,
-    data: dailyReport,
-    columns: [
-      { header: "Data", key: "date", format: (v: any) => String(v).split('-').reverse().join('/') },
-      { header: "Entradas", key: "income", format: (v: any) => formatCurrency(Number(v)) },
-      { header: "Saídas", key: "expense", format: (v: any) => formatCurrency(Number(v)) },
-      { header: "Saldo", key: "balance", format: (v: any, row: any) => formatCurrency((row.income || 0) - (row.expense || 0)) }
-    ]
-  }
 
   if (loading) return <div className="flex justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-[#7c5cfc]" /></div>
 
@@ -249,6 +250,7 @@ export default function RelatoriosPage() {
               columns={exportConfig.columns}
               fileName={exportConfig.fileName}
               title={exportConfig.title}
+              hideImport={true}
             />
             <button onClick={handlePrint} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.625rem 1rem', borderRadius: '0.75rem', border: '1px solid #e5e7eb', background: '#fff', color: '#374151', fontWeight: 600, fontSize: '0.8125rem', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
               <Printer style={{ width: '1rem', height: '1rem' }} /> Imprimir Tela
@@ -257,31 +259,25 @@ export default function RelatoriosPage() {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '1.5rem', alignItems: 'start' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
         
-        {/* Daily Report List */}
-        <PermissionGate permission="reports.financial">
-          <div style={{ background: '#fff', borderRadius: '1rem', border: '1px solid #e5e7eb', overflow: 'hidden', gridColumn: '1 / -1' }}>
-            <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid #f3f4f6', background: '#fafbfc', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <div style={{ width: '2.25rem', height: '2.25rem', borderRadius: '0.625rem', background: 'linear-gradient(135deg, #7c5cfc, #a78bfa)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <CalendarDays style={{ width: '1.125rem', height: '1.125rem', color: '#fff' }} />
-                </div>
-                <div>
-                  <h3 style={{ fontSize: '1.125rem', fontWeight: 800, color: '#1e1e2d', fontFamily: "var(--font-heading)" }}>Histórico Diário</h3>
-                  <p style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.125rem' }}>Selecione um dia para ver o detalhamento completo de caixa e financeiro.</p>
-                </div>
-              </div>
-              <PermissionGate permission="reports.print">
-                <ExportButtons 
-                  data={dailyLedgerExportConfig.data}
-                  columns={dailyLedgerExportConfig.columns}
-                  fileName={dailyLedgerExportConfig.fileName}
-                  title={dailyLedgerExportConfig.title}
-                />
-              </PermissionGate>
+        {/* Tab content */}
+        <div style={{ background: '#fff', borderRadius: '1rem', border: '1px solid #e5e7eb', overflow: 'hidden' }}>
+          <div style={{ padding: '1rem 1.5rem', borderBottom: '1px solid #f3f4f6', background: '#fafbfc', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <div style={{ width: '2.25rem', height: '2.25rem', borderRadius: '0.625rem', background: 'linear-gradient(135deg, #7c5cfc, #a78bfa)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {(() => {
+                const Icon = availableTabs.find(t => t.id === activeTab)?.icon || CalendarDays
+                return <Icon style={{ width: '1.125rem', height: '1.125rem', color: '#fff' }} />
+              })()}
             </div>
-            
+            <div>
+              <h3 style={{ fontSize: '1.125rem', fontWeight: 800, color: '#1e1e2d', fontFamily: "var(--font-heading)" }}>
+                {availableTabs.find(t => t.id === activeTab)?.label}
+              </h3>
+            </div>
+          </div>
+
+          {activeTab === "daily" && (
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                 <thead>
@@ -328,16 +324,7 @@ export default function RelatoriosPage() {
                 </tbody>
               </table>
             </div>
-          </div>
-        </PermissionGate>
-
-        {/* Tab content */}
-        <div style={{ background: '#fff', borderRadius: '1rem', border: '1px solid #e5e7eb', overflow: 'hidden', gridColumn: '1 / -1' }}>
-          <div style={{ padding: '1rem 1.5rem', borderBottom: '1px solid #f3f4f6', background: '#fafbfc' }}>
-            <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#1e1e2d', fontFamily: "var(--font-heading)" }}>
-              {availableTabs.find(t => t.id === activeTab)?.label}
-            </h3>
-          </div>
+          )}
 
           {activeTab === "revenue" && (
             <div style={{ padding: '1.5rem' }}>

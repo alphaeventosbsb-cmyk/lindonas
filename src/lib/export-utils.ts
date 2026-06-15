@@ -135,41 +135,132 @@ export async function exportToPDF<T>(
 // PREPARAÇÃO PARA FUTURA IMPORTAÇÃO (FASE 1: SEM SALVAR DADOS NO BANCO)
 // --------------------------------------------------------------------------------
 
-export async function parseImportFile(file: File): Promise<unknown[]> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      try {
-        const data = new Uint8Array(e.target?.result as ArrayBuffer)
-        const workbook = XLSX.read(data, { type: 'array' })
-        const firstSheetName = workbook.SheetNames[0]
-        if (!firstSheetName) throw new Error("O arquivo não contém planilhas.")
-        const worksheet = workbook.Sheets[firstSheetName]
-        const json = XLSX.utils.sheet_to_json(worksheet, { defval: "" })
-        
-        // Anti-injection sanitizer on values
-        const sanitizedJson = json.map((row: Record<string, unknown>) => {
-          const newRow: Record<string, unknown> = {}
-          for (const key in row) {
-            let val = row[key]
-            if (typeof val === 'string') {
-              val = val.trim()
-              if (val.startsWith('=') || val.startsWith('+') || val.startsWith('-') || val.startsWith('@')) {
-                val = "'" + val
-              }
-            }
-            newRow[key] = val
-          }
-          return newRow
-        })
+function parseCsvText(csvText: string): Record<string, unknown>[] {
+  let text = csvText;
+  if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
 
-        resolve(sanitizedJson)
-      } catch (err) {
-        reject(err)
+  text = text.replace(/PreÃ§o/g, "Preço")
+             .replace(/MÃnimo/g, "Mínimo")
+             .replace(/CÃ³digo/g, "Código")
+             .replace(/DescriÃ§Ã£o/g, "Descrição")
+             .replace(/AtenÃ§Ã£o/g, "Atenção")
+             .replace(/SituaÃ§Ã£o/g, "Situação")
+             .replace(/NÃºmero/g, "Número");
+
+  const parseLine = (line: string, sep: string) => {
+    const result = [];
+    let cur = "";
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+      if (char === '"') {
+        if (inQuotes && i + 1 < line.length && line[i+1] === '"') {
+          cur += '"';
+          i++;
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (char === sep && !inQuotes) {
+        result.push(cur);
+        cur = "";
+      } else {
+        cur += char;
       }
     }
-    reader.onerror = (err) => reject(err)
-    reader.readAsArrayBuffer(file)
+    result.push(cur);
+    return result;
+  };
+
+  const lines = text.split(/\r?\n/).filter(l => l.trim() !== "");
+  if (lines.length === 0) return [];
+
+  const separators = [';', ',', '\t', '|'];
+  let bestSep = ';';
+  let maxCols = 0;
+
+  for (const sep of separators) {
+    const cols = parseLine(lines[0], sep).length;
+    if (cols > maxCols) {
+      maxCols = cols;
+      bestSep = sep;
+    }
+  }
+
+  let headers = parseLine(lines[0], bestSep).map(h => h.trim());
+  if (headers.length === 1) {
+    if (headers[0].includes(';')) bestSep = ';';
+    else if (headers[0].includes(',')) bestSep = ',';
+    headers = parseLine(lines[0], bestSep).map(h => h.trim());
+  }
+
+  const result: Record<string, unknown>[] = [];
+  for (let i = 1; i < lines.length; i++) {
+    const vals = parseLine(lines[i], bestSep);
+    const obj: Record<string, unknown> = {};
+    for (let j = 0; j < headers.length; j++) {
+      let val = vals[j] !== undefined ? vals[j].trim() : "";
+      if (val.startsWith('=') || val.startsWith('+') || val.startsWith('-') || val.startsWith('@')) {
+        val = "'" + val;
+      }
+      obj[headers[j]] = val;
+    }
+    result.push(obj);
+  }
+
+  return result;
+}
+
+export async function parseImportFile(file: File): Promise<unknown[]> {
+  return new Promise((resolve, reject) => {
+    const isCsv = file.name.toLowerCase().endsWith('.csv')
+    
+    if (isCsv) {
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        try {
+          const text = e.target?.result as string
+          const parsed = parseCsvText(text)
+          resolve(parsed)
+        } catch (err) {
+          reject(err)
+        }
+      }
+      reader.onerror = (err) => reject(err)
+      reader.readAsText(file, 'UTF-8')
+    } else {
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target?.result as ArrayBuffer)
+          const workbook = XLSX.read(data, { type: 'array' })
+          const firstSheetName = workbook.SheetNames[0]
+          if (!firstSheetName) throw new Error("O arquivo não contém planilhas.")
+          const worksheet = workbook.Sheets[firstSheetName]
+          const json = XLSX.utils.sheet_to_json(worksheet, { defval: "" })
+          
+          const sanitizedJson = json.map((row: Record<string, unknown>) => {
+            const newRow: Record<string, unknown> = {}
+            for (const key in row) {
+              let val = row[key]
+              if (typeof val === 'string') {
+                val = val.trim()
+                if (val.startsWith('=') || val.startsWith('+') || val.startsWith('-') || val.startsWith('@')) {
+                  val = "'" + val
+                }
+              }
+              newRow[key] = val
+            }
+            return newRow
+          })
+
+          resolve(sanitizedJson)
+        } catch (err) {
+          reject(err)
+        }
+      }
+      reader.onerror = (err) => reject(err)
+      reader.readAsArrayBuffer(file)
+    }
   })
 }
 
@@ -189,6 +280,13 @@ export function validateImportRows(data: unknown[]): { valid: unknown[], errors:
   if (data.length === 0) errors.push("O arquivo está vazio ou não possui cabeçalhos.")
   if (valid.length === 0 && data.length > 0) errors.push("Nenhuma linha de dados válida encontrada.")
   
+  if (valid.length > 0 && errors.length === 0) {
+    const sampleKeys = Object.keys(valid[0] as Record<string, unknown>);
+    if (sampleKeys.length === 1) {
+      errors.push("CSV não separado corretamente. Tente salvar como CSV separado por ponto e vírgula ou use arquivo Excel .xlsx.")
+    }
+  }
+
   return { valid, errors }
 }
 

@@ -4,6 +4,7 @@ import { useState } from "react"
 import { createDocument, updateDocument, fetchCollection } from "@/lib/firebase/client-utils"
 import { useTenant } from "@/lib/auth/tenant-context"
 import { getAuthInstance } from "@/lib/firebase/config"
+import { createHistoryEvent } from "@/lib/firebase/history-service"
 import { X, Wallet, AlertCircle, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import type { Client, ClientTransaction, ClientTransactionType } from "@/lib/types/database"
@@ -95,6 +96,34 @@ export function ClientTransactionModal({ client, type, onClose, onSuccess }: Pro
       }
 
       await updateDocument("clients", client.id, updates)
+
+      // Registra no Histórico Geral
+      const oldCredit = client.credit_amount || 0
+      const oldDebt = client.debt_amount || 0
+      const newCredit = type === "credit" ? oldCredit + val : type === "use_credit" ? Math.max(0, oldCredit - val) : oldCredit
+      const newDebt = type === "debit" ? oldDebt + val : oldDebt
+
+      const actionTypeStr = type === "credit" ? "credit_add" : type === "use_credit" ? "credit_use" : "debit_add"
+      const actionTitleStr = type === "credit" ? "Crédito adicionado" : type === "use_credit" ? "Crédito usado" : "Débito adicionado"
+      
+      const balanceDesc = type === "debit" 
+        ? `Saldo anterior: R$ ${oldDebt.toFixed(2).replace(".", ",")} | Saldo atual: R$ ${newDebt.toFixed(2).replace(".", ",")}` 
+        : `Saldo anterior: R$ ${oldCredit.toFixed(2).replace(".", ",")} | Saldo atual: R$ ${newCredit.toFixed(2).replace(".", ",")}`
+        
+      const descStr = `Cliente: ${client.name} | ${actionTitleStr}: R$ ${val.toFixed(2).replace(".", ",")} | Origem: ${origin || "Manual"} | ${balanceDesc}`
+
+      await createHistoryEvent({
+        client_id: client.id,
+        client_name: client.name,
+        action_type: actionTypeStr,
+        action_title: actionTitleStr,
+        action_description: descStr,
+        old_value: type === "debit" ? oldDebt : oldCredit,
+        new_value: type === "debit" ? newDebt : newCredit,
+        performed_by_user_id: user.uid,
+        performed_by_name: user.displayName || "Usuário",
+        performed_by_email: user.email || null
+      })
 
       toast.success(type === "credit" ? "Crédito adicionado com sucesso" : type === "use_credit" ? "Crédito utilizado com sucesso" : "Débito adicionado com sucesso")
       onSuccess()

@@ -12,6 +12,8 @@ import { toast } from "sonner"
 import { useConfirm } from "@/components/ui/confirm-modal"
 import { normalizeSearchText } from "@/lib/search"
 import { ExportButtons } from "@/components/ui/export-buttons"
+import { createHistoryEvent } from "@/lib/firebase/history-service"
+import { getAuthInstance } from "@/lib/firebase/config"
 
 export default function DebitoClientePage() {
   const [clients, setClients] = useState<Client[]>([])
@@ -54,6 +56,23 @@ export default function DebitoClientePage() {
         debt_amount: 0,
         status: "active"
       })
+
+      const user = getAuthInstance().currentUser
+      if (user) {
+        await createHistoryEvent({
+          client_id: client.id,
+          client_name: client.name,
+          action_type: "debit_paid",
+          action_title: "Débito quitado",
+          action_description: `Cliente: ${client.name} | Débito quitado: R$ ${(client.debt_amount || 0).toFixed(2).replace(".", ",")} | Saldo anterior: R$ ${(client.debt_amount || 0).toFixed(2).replace(".", ",")} | Saldo atual: R$ 0,00`,
+          old_value: client.debt_amount || 0,
+          new_value: 0,
+          performed_by_user_id: user.uid,
+          performed_by_name: user.displayName || "Usuário",
+          performed_by_email: user.email || null
+        })
+      }
+
       toast.success("Débito quitado com sucesso!")
       load()
     } catch (err) {

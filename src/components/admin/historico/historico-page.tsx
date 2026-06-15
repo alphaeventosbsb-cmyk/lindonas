@@ -120,6 +120,18 @@ export function HistoricoPage() {
           case 'TIME_BLOCKED':
             matched = typeStr === 'block' || (titleStr.includes('bloqueio') && !titleStr.includes('geral'))
             break
+          case 'CREDIT_ADD':
+            matched = typeStr === 'credit_add' || titleStr.includes('crédito adicionado')
+            break
+          case 'CREDIT_USE':
+            matched = typeStr === 'credit_use' || titleStr.includes('crédito usado') || titleStr.includes('crédito utilizado') || titleStr.includes('crédito removido')
+            break
+          case 'DEBIT_ADD':
+            matched = typeStr === 'debit_add' || titleStr.includes('débito adicionado') || titleStr.includes('débito gerado')
+            break
+          case 'DEBIT_PAID':
+            matched = typeStr === 'debit_paid' || titleStr.includes('débito quitado') || titleStr.includes('débito removido')
+            break
           default:
             matched = typeStr === actionFilter.toLowerCase() || titleStr === actionFilter.toLowerCase()
         }
@@ -157,7 +169,11 @@ export function HistoricoPage() {
     { label: 'Serviços adicionados', value: 'SERVICES_ADDED' },
     { label: 'Agendamento editado', value: 'APPOINTMENT_UPDATED' },
     { label: 'Liberação de Horário', value: 'TIME_RELEASED' },
-    { label: 'Bloqueio de Horário', value: 'TIME_BLOCKED' }
+    { label: 'Bloqueio de Horário', value: 'TIME_BLOCKED' },
+    { label: 'Crédito adicionado', value: 'CREDIT_ADD' },
+    { label: 'Crédito usado', value: 'CREDIT_USE' },
+    { label: 'Débito adicionado', value: 'DEBIT_ADD' },
+    { label: 'Débito quitado', value: 'DEBIT_PAID' }
   ]
 
   const [selectedEvent, setSelectedEvent] = useState<HistoryEvent | null>(null)

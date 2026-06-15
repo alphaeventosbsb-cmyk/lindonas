@@ -9,6 +9,7 @@ import { useTenant } from "@/lib/auth/tenant-context"
 import { toast } from "sonner"
 import { usePermission } from "@/lib/rbac/usePermission"
 import { PermissionGate } from "@/components/ui/permission-gate"
+import { createHistoryEvent } from "@/lib/firebase/history-service"
 
 interface Props { appointment: Appointment; onClose: () => void; onDone: () => void }
 
@@ -364,9 +365,14 @@ export function CloseAccountModal({ appointment, onClose, onDone }: Props) {
       const existingClients = await fetchCollectionWhere<Client>("clients", "phone", "==", apt.client_phone)
       
       let clientId = ""
+      let oldCredit = 0
+      let oldDebt = 0
+
       if (existingClients.length > 0) {
         const client = existingClients[0]
         clientId = client.id
+        oldCredit = client.credit_amount || 0
+        oldDebt = client.debt_amount || 0
         await updateDocument("clients", client.id, {
           last_visit: apt.appointment_date,
           total_spent: (client.total_spent || 0) + paidValue,
@@ -434,6 +440,55 @@ export function CloseAccountModal({ appointment, onClose, onDone }: Props) {
           status: "active",
           created_at: new Date().toISOString()
         })
+      }
+
+      // Log no Histórico Geral se houve alteração
+      if (creditVal > 0 || debtVal > 0 || usedCredit > 0) {
+        const newCredit = Math.max(0, oldCredit + creditVal - usedCredit)
+        const newDebt = oldDebt + debtVal
+
+        if (creditVal > 0) {
+          await createHistoryEvent({
+            client_id: clientId,
+            client_name: apt.client_name,
+            action_type: "credit_add",
+            action_title: "Crédito adicionado",
+            action_description: `Cliente: ${apt.client_name} | Crédito gerado automaticamente: R$ ${creditVal.toFixed(2).replace(".", ",")} | Origem: Pagamento Acima | Saldo anterior: R$ ${oldCredit.toFixed(2).replace(".", ",")} | Saldo atual: R$ ${newCredit.toFixed(2).replace(".", ",")}`,
+            old_value: oldCredit,
+            new_value: newCredit,
+            performed_by_user_id: saasUser?.id || "system",
+            performed_by_name: saasUser?.name || "Sistema",
+            performed_by_email: saasUser?.email || null
+          })
+        }
+        if (usedCredit > 0) {
+          await createHistoryEvent({
+            client_id: clientId,
+            client_name: apt.client_name,
+            action_type: "credit_use",
+            action_title: "Crédito usado",
+            action_description: `Cliente: ${apt.client_name} | Crédito utilizado no agendamento: R$ ${usedCredit.toFixed(2).replace(".", ",")} | Saldo anterior: R$ ${oldCredit.toFixed(2).replace(".", ",")} | Saldo atual: R$ ${newCredit.toFixed(2).replace(".", ",")}`,
+            old_value: oldCredit,
+            new_value: newCredit,
+            performed_by_user_id: saasUser?.id || "system",
+            performed_by_name: saasUser?.name || "Sistema",
+            performed_by_email: saasUser?.email || null
+          })
+        }
+        if (debtVal > 0) {
+          await createHistoryEvent({
+            client_id: clientId,
+            client_name: apt.client_name,
+            action_type: "debit_add",
+            action_title: "Débito adicionado",
+            action_description: `Cliente: ${apt.client_name} | Débito gerado automaticamente: R$ ${debtVal.toFixed(2).replace(".", ",")} | Origem: Pagamento Parcial/Pendente | Saldo anterior: R$ ${oldDebt.toFixed(2).replace(".", ",")} | Saldo atual: R$ ${newDebt.toFixed(2).replace(".", ",")}`,
+            old_value: oldDebt,
+            new_value: newDebt,
+            performed_by_user_id: saasUser?.id || "system",
+            performed_by_name: saasUser?.name || "Sistema",
+            performed_by_email: saasUser?.email || null
+          })
+        }
       }
     } catch (err) {
       console.error("Erro ao criar/atualizar cliente:", err)

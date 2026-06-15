@@ -16,6 +16,8 @@ import { usePermission } from "@/lib/rbac/usePermission"
 import { PermissionGate } from "@/components/ui/permission-gate"
 import { maskCPF, maskPhone, maskEmail } from "@/lib/rbac/rbac-utils"
 import { createHistoryEvent } from "@/lib/firebase/history-service"
+import { ExportButtons } from "@/components/ui/export-buttons"
+import { type ColumnDef, formatDateForExport } from "@/lib/export-utils"
 
 export default function ClientesPage() {
   const [clients, setClients] = useState<Client[]>([])
@@ -147,6 +149,16 @@ export default function ClientesPage() {
 
   if (loading) return <div className="flex justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-[#7c5cfc]" /></div>
 
+  const exportColumns: ColumnDef<Client>[] = [
+    { header: "Nome", key: "name" },
+    { header: "Telefone", key: "phone" },
+    { header: "Email", key: "email" },
+    { header: "CPF", key: "cpf", format: (v) => v || "—" },
+    { header: "Nascimento", key: "birth_date", format: formatDateForExport },
+    { header: "Status", key: "status", format: (v) => v === "debtor" ? "Devedor" : v === "active" ? "Ativo" : "Inativo" },
+    { header: "Data Cadastro", key: "created_at", format: formatDateForExport },
+  ]
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       {/* Stats */}
@@ -192,6 +204,13 @@ export default function ClientesPage() {
             <Plus style={{ width: '1rem', height: '1rem' }} /> Novo Cliente
           </button>
         </PermissionGate>
+        <ExportButtons
+          data={filtered}
+          columns={exportColumns}
+          fileName={`clientes-${new Date().toISOString().split('T')[0]}`}
+          title="Relatório de Clientes"
+          importModule="clientes"
+        />
         <div style={{ display: 'flex', gap: '0.375rem', background: '#f8fafc', padding: '0.25rem', borderRadius: '0.5rem', border: '1px solid #e2e8f0', marginLeft: 'auto' }}>
           <button 
             onClick={() => setViewMode("cards")}

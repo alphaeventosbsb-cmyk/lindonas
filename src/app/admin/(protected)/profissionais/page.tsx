@@ -16,6 +16,8 @@ import { PermissionGate } from "@/components/ui/permission-gate"
 import { maskPhone, maskEmail } from "@/lib/rbac/rbac-utils"
 import { logPermissionChange } from "@/lib/audit-logger"
 import { useTenant } from "@/lib/auth/tenant-context"
+import { ExportButtons } from "@/components/ui/export-buttons"
+import { type ColumnDef, formatDateForExport } from "@/lib/export-utils"
 
 const weekDays = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"]
 const gradients = [
@@ -230,6 +232,19 @@ export default function ProfissionaisPage() {
 
   if (loading) return <div style={{ display: 'flex', justifyContent: 'center', padding: '5rem 0' }}><Loader2 className="w-8 h-8 animate-spin" style={{ color: '#7c5cfc' }} /></div>
 
+  const exportColumns: ColumnDef<Employee>[] = [
+    { header: "Nome", key: "name" },
+    { header: "Telefone", key: "phone" },
+    { header: "Email", key: "email" },
+    { header: "Especialidade", key: "specialty", format: (v) => v || "—" },
+    { header: "Comissão (%)", key: "commission_percent", format: (v) => v != null ? `${v}%` : "0%" },
+    { header: "Status", key: "status", format: (v, row) => {
+        const s = v || (row.is_active ? 'active' : 'inactive')
+        return statusColors[s]?.label || "Ativo"
+    }},
+    { header: "Data Cadastro", key: "created_at", format: formatDateForExport },
+  ]
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
       {/* Header */}
@@ -270,6 +285,12 @@ export default function ProfissionaisPage() {
               <Plus style={{ width: '16px', height: '16px' }} /> Novo Profissional
             </button>
           </PermissionGate>
+          <ExportButtons
+            data={filtered}
+            columns={exportColumns}
+            fileName={`profissionais-${new Date().toISOString().split('T')[0]}`}
+            title="Relatório de Profissionais"
+          />
         </div>
       </div>
 

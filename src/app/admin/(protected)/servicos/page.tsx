@@ -14,6 +14,8 @@ import { ServiceFormModal } from "@/components/admin/service-form-modal"
 import { CategoryManagerModal } from "@/components/admin/category-manager-modal"
 import { usePermission } from "@/lib/rbac/usePermission"
 import { PermissionGate } from "@/components/ui/permission-gate"
+import { ExportButtons } from "@/components/ui/export-buttons"
+import { type ColumnDef, formatCurrencyForExport } from "@/lib/export-utils"
 
 const inputStyle: React.CSSProperties = {
   width: '100%', padding: '0.75rem 1rem', borderRadius: '0.75rem',
@@ -220,6 +222,16 @@ export default function ServicosPage() {
 
   if (loading) return <div className="flex justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-[#7c5cfc]" /></div>
 
+  const exportColumns: ColumnDef<Service>[] = [
+    { header: "Nome", key: "name" },
+    { header: "Categoria", key: "category_id", format: (v) => getCategoryName(v) },
+    { header: "Duração", key: "duration_minutes", format: (v) => formatDuration(v) },
+    { header: "Valor", key: "price", format: formatCurrencyForExport },
+    { header: "Valor Promo", key: "promotional_price", format: (v) => v ? formatCurrencyForExport(v) : "—" },
+    { header: "Visível Online", key: "hide_from_online_booking", format: (v) => v ? "Não" : "Sim" },
+    { header: "Status", key: "is_active", format: (v) => v ? "Ativo" : "Inativo" }
+  ]
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
       {/* Header */}
@@ -271,6 +283,13 @@ export default function ServicosPage() {
               <Plus style={{ width: '16px', height: '16px' }} /> Novo Serviço
             </button>
           </PermissionGate>
+          <ExportButtons
+            data={filtered}
+            columns={exportColumns}
+            fileName={`servicos-${new Date().toISOString().split('T')[0]}`}
+            title="Relatório de Serviços"
+            importModule="servicos"
+          />
         </div>
       </div>
 

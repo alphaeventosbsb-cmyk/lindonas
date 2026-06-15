@@ -1,0 +1,241 @@
+import * as XLSX from 'xlsx'
+import jsPDF from 'jspdf'
+import autoTable from 'jspdf-autotable'
+
+export interface ColumnDef<T> {
+  header: string
+  key: keyof T | string
+  format?: (value: unknown, row: T) => string
+}
+
+// Formatters seguros e reutilizáveis
+export const formatCurrencyForExport = (val: number | null | undefined | unknown) => {
+  if (val == null || typeof val !== 'number') return "R$ 0,00"
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val)
+}
+
+export const formatDateForExport = (val: string | null | undefined | unknown) => {
+  if (!val || typeof val !== 'string') return "—"
+  try {
+    // If it's YYYY-MM-DD
+    if (val.includes('-')) {
+      const parts = val.split('T')[0].split('-')
+      if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`
+    }
+    return val
+  } catch {
+    return val
+  }
+}
+
+export const sanitizeExportValue = (value: unknown): string => {
+  if (value === null || value === undefined || value === "") return "—"
+  let str = String(value)
+  if (str.trim() === "") return "—"
+  // Evitar fórmulas perigosas (CSV/Excel Injection)
+  if (str.startsWith('=') || str.startsWith('+') || str.startsWith('-') || str.startsWith('@')) {
+    str = "'" + str
+  }
+  return str
+}
+
+export async function exportToExcel<T>(
+  data: T[],
+  columns: ColumnDef<T>[],
+  fileName: string
+) {
+  try {
+    // Mapear os dados de acordo com as colunas
+    const mappedData = data.map(row => {
+      const newRow: Record<string, string> = {}
+      columns.forEach(col => {
+        let val: unknown = null
+        if (typeof col.key === 'string' && col.key in (row as object)) {
+          val = (row as Record<string, unknown>)[col.key]
+        }
+        if (col.format) {
+          val = col.format(val, row)
+        }
+        newRow[col.header] = sanitizeExportValue(val)
+      })
+      return newRow
+    })
+
+    const worksheet = XLSX.utils.json_to_sheet(mappedData)
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Dados')
+
+    // Ajustar largura das colunas
+    const wscols = columns.map(col => ({ wch: Math.max(col.header.length, 15) }))
+    worksheet['!cols'] = wscols
+
+    XLSX.writeFile(workbook, `${fileName}.xlsx`)
+    return true
+  } catch (error) {
+    console.error("Erro na exportação para Excel:", error)
+    throw error
+  }
+}
+
+export async function exportToPDF<T>(
+  data: T[],
+  columns: ColumnDef<T>[],
+  title: string,
+  fileName: string
+) {
+  try {
+    const doc = new jsPDF(columns.length > 6 ? 'landscape' : 'portrait', 'pt', 'a4')
+
+    const headers = columns.map(col => col.header)
+    const rows = data.map(row => {
+      return columns.map(col => {
+        let val: unknown = null
+        if (typeof col.key === 'string' && col.key in (row as object)) {
+          val = (row as Record<string, unknown>)[col.key]
+        }
+        if (col.format) {
+          val = col.format(val, row)
+        }
+        return sanitizeExportValue(val)
+      })
+    })
+
+    // Cabeçalho Principal
+    doc.setFontSize(16)
+    doc.text('Salão Lindonas', 40, 40)
+    
+    doc.setFontSize(12)
+    doc.text(title, 40, 60)
+    
+    const now = new Date()
+    const dateStr = now.toLocaleDateString('pt-BR') + ' ' + now.toLocaleTimeString('pt-BR')
+    doc.setFontSize(8)
+    doc.text(`Gerado em: ${dateStr}`, 40, 75)
+
+    autoTable(doc, {
+      head: [headers],
+      body: rows,
+      startY: 90,
+      theme: 'grid',
+      styles: { fontSize: 8, cellPadding: 4 },
+      headStyles: { fillColor: [124, 92, 252], textColor: 255, fontStyle: 'bold' },
+      alternateRowStyles: { fillColor: [249, 250, 251] },
+      margin: { top: 40, left: 40, right: 40, bottom: 40 }
+    })
+
+    doc.save(`${fileName}.pdf`)
+    return true
+  } catch (error) {
+    console.error("Erro na exportação para PDF:", error)
+    throw error
+  }
+}
+
+// --------------------------------------------------------------------------------
+// PREPARAÇÃO PARA FUTURA IMPORTAÇÃO (FASE 1: SEM SALVAR DADOS NO BANCO)
+// --------------------------------------------------------------------------------
+
+export async function parseImportFile(file: File): Promise<unknown[]> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer)
+        const workbook = XLSX.read(data, { type: 'array' })
+        const firstSheetName = workbook.SheetNames[0]
+        if (!firstSheetName) throw new Error("O arquivo não contém planilhas.")
+        const worksheet = workbook.Sheets[firstSheetName]
+        const json = XLSX.utils.sheet_to_json(worksheet, { defval: "" })
+        
+        // Anti-injection sanitizer on values
+        const sanitizedJson = json.map((row: Record<string, unknown>) => {
+          const newRow: Record<string, unknown> = {}
+          for (const key in row) {
+            let val = row[key]
+            if (typeof val === 'string') {
+              val = val.trim()
+              if (val.startsWith('=') || val.startsWith('+') || val.startsWith('-') || val.startsWith('@')) {
+                val = "'" + val
+              }
+            }
+            newRow[key] = val
+          }
+          return newRow
+        })
+
+        resolve(sanitizedJson)
+      } catch (err) {
+        reject(err)
+      }
+    }
+    reader.onerror = (err) => reject(err)
+    reader.readAsArrayBuffer(file)
+  })
+}
+
+export function validateImportRows(data: unknown[]): { valid: unknown[], errors: string[] } {
+  if (!Array.isArray(data)) return { valid: [], errors: ["Dados inválidos"] }
+  
+  const valid = data.filter(row => {
+    if (!row || typeof row !== 'object') return false
+    const values = Object.values(row)
+    if (values.length === 0) return false
+    // se todas as colunas estão vazias, considera inválido/linha vazia
+    if (values.every(v => v === null || v === undefined || v === "")) return false
+    return true
+  })
+
+  const errors = []
+  if (data.length === 0) errors.push("O arquivo está vazio ou não possui cabeçalhos.")
+  if (valid.length === 0 && data.length > 0) errors.push("Nenhuma linha de dados válida encontrada.")
+  
+  return { valid, errors }
+}
+
+export function previewImportData(_data: unknown[]) {
+  // Can be used to slice top 10 items. But UI might handle this.
+}
+
+const sanitizeColumnName = (col: string) => col.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim()
+
+export function mapImportColumns(row: unknown, moduleType?: "clientes" | "estoque" | "servicos"): Record<string, string> {
+  const mapping: Record<string, string> = {}
+  if (!row || typeof row !== 'object' || !moduleType) return mapping
+
+  const keys = Object.keys(row)
+  
+  keys.forEach(k => {
+    const cleanK = sanitizeColumnName(k)
+    // Common
+    if (cleanK === 'nome' || cleanK === 'cliente' || cleanK === 'produto' || cleanK === 'servico' || cleanK === 'titulo') mapping.name = k
+    if (cleanK.includes('status') || cleanK === 'ativo') mapping.status = k
+
+    if (moduleType === "clientes") {
+      if (cleanK.includes('telefone') || cleanK.includes('celular') || cleanK.includes('whatsapp') || cleanK.includes('contato')) mapping.phone = k
+      if (cleanK === 'email' || cleanK === 'e-mail') mapping.email = k
+      if (cleanK.includes('cpf') || cleanK.includes('documento')) mapping.cpf = k
+      if (cleanK.includes('nascimento') || cleanK.includes('data de nascimento') || cleanK.includes('data nascimento')) mapping.birth_date = k
+      if (cleanK.includes('endereco') || cleanK.includes('rua') || cleanK.includes('logradouro')) mapping.address = k
+      if (cleanK.includes('obs') || cleanK.includes('observacoes') || cleanK.includes('notas')) mapping.notes = k
+    }
+    
+    if (moduleType === "estoque") {
+      if (cleanK.includes('categoria') || cleanK.includes('marca')) mapping.category = k
+      if (cleanK.includes('sku') || cleanK.includes('codigo') || cleanK.includes('ref')) mapping.sku = k
+      if (cleanK === 'quantidade' || cleanK === 'estoque' || cleanK === 'qtd' || cleanK.includes('estoque atual')) mapping.stock_quantity = k
+      if (cleanK.includes('preco de venda') || cleanK.includes('venda') || cleanK.includes('valor')) mapping.sale_price = k
+      if (cleanK.includes('preco de custo') || cleanK.includes('custo') || cleanK.includes('valor de custo')) mapping.cost_price = k
+      if (cleanK.includes('fornecedor')) mapping.supplier = k
+    }
+
+    if (moduleType === "servicos") {
+      if (cleanK.includes('categoria')) mapping.category = k
+      if (cleanK.includes('valor') || cleanK.includes('preco')) mapping.price = k
+      if (cleanK.includes('duracao') || cleanK.includes('tempo') || cleanK.includes('minutos')) mapping.duration_minutes = k
+      if (cleanK.includes('comissao') || cleanK.includes('%')) mapping.commission = k
+      if (cleanK.includes('descricao')) mapping.description = k
+    }
+  })
+
+  return mapping
+}

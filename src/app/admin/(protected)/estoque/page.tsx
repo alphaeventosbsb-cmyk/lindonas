@@ -12,6 +12,8 @@ import { toast } from "sonner"
 import { useConfirm } from "@/components/ui/confirm-modal"
 import { usePermission } from "@/lib/rbac/usePermission"
 import { PermissionGate } from "@/components/ui/permission-gate"
+import { ExportButtons } from "@/components/ui/export-buttons"
+import { type ColumnDef, formatCurrencyForExport } from "@/lib/export-utils"
 
 export default function EstoquePage() {
   const { saasUser, companyId } = useTenant()
@@ -176,7 +178,15 @@ export default function EstoquePage() {
   const totalItems = products.length
   const lowStock = products.filter(p => p.stock_quantity <= (p.min_stock || 1)).length
 
-
+  const exportColumns: ColumnDef<Product>[] = [
+    { header: "Nome", key: "name" },
+    { header: "SKU", key: "sku", format: (v) => v || "—" },
+    { header: "Estoque", key: "stock_quantity", format: (v, row) => `${v} ${row.unit || ""}`.trim() },
+    { header: "Min.", key: "min_stock", format: (v) => v || "1" },
+    { header: "Custo", key: "cost_price", format: formatCurrencyForExport },
+    { header: "Venda", key: "sale_price", format: formatCurrencyForExport },
+    { header: "Status", key: "is_active", format: (v) => v ? "Ativo" : "Inativo" }
+  ]
 
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
@@ -246,6 +256,13 @@ export default function EstoquePage() {
               <Plus style={{ width: '1.125rem', height: '1.125rem' }} /> Novo Produto
             </button>
           </PermissionGate>
+          <ExportButtons
+            data={filtered}
+            columns={exportColumns}
+            fileName={`estoque-${new Date().toISOString().split('T')[0]}`}
+            title="Relatório de Estoque"
+            importModule="estoque"
+          />
         </div>
       </div>
 

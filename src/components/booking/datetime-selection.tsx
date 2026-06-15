@@ -68,8 +68,7 @@ export function DateTimeSelection({
       startTime = selectedEmployee.working_hours_start
       endTime = selectedEmployee.working_hours_end
       if (selectedEmployee.schedule_by_day) {
-        const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
-        const schedule = selectedEmployee.schedule_by_day[dayNames[dow]]
+        const schedule = selectedEmployee.schedule_by_day[dow.toString()]
         if (schedule && schedule.enabled) {
           startTime = schedule.start || startTime
           endTime = schedule.end || endTime

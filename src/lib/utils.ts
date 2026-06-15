@@ -94,9 +94,8 @@ export function validateScheduleOvertime(time: string, durationMinutes: number, 
     if (employee.schedule_by_day) {
       const [y, mStr, dStr] = date.split('-').map(Number)
       const d = new Date(y, mStr - 1, dStr)
-      const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
-      const dayName = dayNames[d.getDay()]
-      const schedule = employee.schedule_by_day[dayName]
+      const dayOfWeek = d.getDay()
+      const schedule = employee.schedule_by_day[dayOfWeek.toString()]
       
       if (schedule && schedule.enabled && schedule.end) {
         closingTimeStr = schedule.end
@@ -125,9 +124,7 @@ export function professionalWorksOnDate(employee: Employee | null, date: string)
 
   // 1. First check schedule_by_day if it exists and has the specific day
   if (employee.schedule_by_day && Object.keys(employee.schedule_by_day).length > 0) {
-    const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
-    const dayName = dayNames[dayOfWeek]
-    const schedule = employee.schedule_by_day[dayName]
+    const schedule = employee.schedule_by_day[dayOfWeek.toString()]
     if (schedule !== undefined) {
       return schedule.enabled
     }
@@ -188,9 +185,7 @@ export function checkBusinessRules(
     isClosed = false
 
     if (employee.schedule_by_day && Object.keys(employee.schedule_by_day).length > 0) {
-      const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
-      const dayName = dayNames[dayOfWeek]
-      const schedule = employee.schedule_by_day[dayName]
+      const schedule = employee.schedule_by_day[dayOfWeek.toString()]
       if (schedule && schedule.enabled) {
         openingTimeStr = schedule.start || openingTimeStr
         closingTimeStr = schedule.end || closingTimeStr

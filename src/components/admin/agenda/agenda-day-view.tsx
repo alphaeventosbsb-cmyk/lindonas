@@ -693,9 +693,8 @@ function ProfessionalColumn({ employee, appointments, isToday, currentTimePos, o
 
   /* Extract specific day schedule */
   const [y, mStr, dStr] = store.selectedDate.split('-').map(Number)
-  const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
-  const currentDayName = dayNames[new Date(y, mStr - 1, dStr).getDay()]
-  const scheduleForDay = employee?.schedule_by_day?.[currentDayName]
+  const currentDayNum = new Date(y, mStr - 1, dStr).getDay()
+  const scheduleForDay = employee?.schedule_by_day?.[currentDayNum.toString()]
 
   const lunchStart = scheduleForDay?.lunchStart || null
   const lunchEnd = scheduleForDay?.lunchEnd || null

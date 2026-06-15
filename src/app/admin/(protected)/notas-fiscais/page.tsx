@@ -194,6 +194,8 @@ export default function NotasFiscaisPage() {
           columns={exportConfig.columns}
           fileName={exportConfig.fileName}
           title={exportConfig.title}
+          exportPermissionKey="invoices.export"
+          moduleName="notas-fiscais"
         />
         <PermissionGate permission="invoices.create">
           <button onClick={openNew}

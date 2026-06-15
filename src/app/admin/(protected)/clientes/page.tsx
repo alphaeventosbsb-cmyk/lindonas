@@ -27,7 +27,7 @@ export default function ClientesPage() {
   const [editing, setEditing] = useState<Client | null>(null)
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
-  const { isProfessional, saasUser } = useTenant()
+  const { isProfessional, saasUser, companyId } = useTenant()
   const { can } = usePermission()
   const canEdit = can("clients.edit")
   const canCreate = can("clients.create")
@@ -186,6 +186,21 @@ export default function ClientesPage() {
     }
 
     toast.success(`Importação concluída! ${createdCount} criados, ${errorCount} falhas.`)
+    if (saasUser) {
+      logDataAudit({
+        company_id: companyId || saasUser.company_id || "unknown",
+        user_id: saasUser.id,
+        user_name: saasUser.name,
+        user_email: saasUser.email || undefined,
+        action: "IMPORT",
+        module: "clientes",
+        format: "CSV/Excel",
+        total_lines: importedClients.length,
+        created: createdCount,
+        errors: errorCount,
+        status: errorCount === 0 ? "success" : (createdCount > 0 ? "partial" : "error")
+      })
+    }
     load()
   }
 

@@ -290,6 +290,8 @@ export default function ProfissionaisPage() {
             columns={exportColumns}
             fileName={`profissionais-${new Date().toISOString().split('T')[0]}`}
             title="Relatório de Profissionais"
+            exportPermissionKey="professionals.export"
+            moduleName="profissionais"
           />
         </div>
       </div>

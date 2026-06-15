@@ -221,6 +221,8 @@ export default function CaixaPage() {
               columns={exportConfig.columns}
               fileName={exportConfig.fileName}
               title={exportConfig.title}
+              exportPermissionKey="cash.export"
+              moduleName="caixa"
             />
           </PermissionGate>
         </div>

@@ -257,6 +257,8 @@ export default function PagamentosPage() {
                 columns={exportConfig.columns}
                 fileName={exportConfig.fileName}
                 title={exportConfig.title}
+                exportPermissionKey="commissions.export"
+                moduleName="comissões"
               />
             </PermissionGate>
             <div style={{ display: 'flex', gap: '0.375rem', background: '#f8fafc', padding: '0.25rem', borderRadius: '0.5rem', border: '1px solid #e2e8f0' }}>

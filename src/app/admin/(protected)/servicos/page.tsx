@@ -15,7 +15,8 @@ import { CategoryManagerModal } from "@/components/admin/category-manager-modal"
 import { usePermission } from "@/lib/rbac/usePermission"
 import { PermissionGate } from "@/components/ui/permission-gate"
 import { ExportButtons } from "@/components/ui/export-buttons"
-import { type ColumnDef, formatCurrencyForExport } from "@/lib/export-utils"
+import { type ColumnDef, formatCurrencyForExport, formatDurationForExport } from "@/lib/export-utils"
+import { logDataAudit } from "@/lib/firebase/audit-service"
 
 const inputStyle: React.CSSProperties = {
   width: '100%', padding: '0.75rem 1rem', borderRadius: '0.75rem',
@@ -57,6 +58,7 @@ export default function ServicosPage() {
   const [selectionMode, setSelectionMode] = useState(false)
   const [viewMode, setViewMode] = useState<"list" | "cards">("list")
   const { can } = usePermission()
+  const { saasUser, companyId } = useTenant()
   const canEdit = can("services.edit")
 
   const load = async () => {
@@ -256,6 +258,23 @@ export default function ServicosPage() {
     if (successCount > 0) toast.success(`${successCount} serviço(s) importados!`)
     if (failCount > 0) toast.error(`${failCount} falharam.`)
     if (duplicateCount > 0) toast.info(`${duplicateCount} duplicados ignorados.`)
+    
+    if (saasUser) {
+      logDataAudit({
+        company_id: companyId || saasUser.company_id || "unknown",
+        user_id: saasUser.id,
+        user_name: saasUser.name,
+        user_email: saasUser.email || undefined,
+        action: "IMPORT",
+        module: "servicos",
+        format: "CSV/Excel",
+        total_lines: payloads.length,
+        created: successCount,
+        ignored: duplicateCount,
+        errors: failCount,
+        status: failCount === 0 ? "success" : (successCount > 0 ? "partial" : "error")
+      })
+    }
     load()
   }
 
@@ -399,8 +418,10 @@ export default function ServicosPage() {
             fileName={`servicos-${new Date().toISOString().split('T')[0]}`}
             title="Relatório de Serviços"
             importModule="servicos"
-            fullData={services}
             onImportConfirm={handleImportConfirm}
+            exportPermissionKey="services.export"
+            importPermissionKey="services.import"
+            moduleName="servicos"
           />
         </div>
       </div>

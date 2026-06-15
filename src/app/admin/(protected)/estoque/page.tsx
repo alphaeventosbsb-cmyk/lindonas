@@ -14,6 +14,7 @@ import { usePermission } from "@/lib/rbac/usePermission"
 import { PermissionGate } from "@/components/ui/permission-gate"
 import { ExportButtons } from "@/components/ui/export-buttons"
 import { type ColumnDef, formatCurrencyForExport } from "@/lib/export-utils"
+import { logDataAudit } from "@/lib/firebase/audit-service"
 
 export default function EstoquePage() {
   const { saasUser, companyId } = useTenant()
@@ -271,6 +272,22 @@ export default function EstoquePage() {
     if (successCount > 0) toast.success(`${successCount} produto(s) importado(s) com sucesso!`)
     if (failCount > 0) toast.error(`${failCount} falharam.`)
     
+    if (saasUser) {
+      logDataAudit({
+        company_id: companyId || saasUser.company_id || "unknown",
+        user_id: saasUser.id,
+        user_name: saasUser.name,
+        user_email: saasUser.email || undefined,
+        action: "IMPORT",
+        module: "produtos",
+        format: "CSV/Excel",
+        total_lines: dataToImport.length,
+        created: successCount,
+        errors: failCount,
+        status: failCount === 0 ? "success" : (successCount > 0 ? "partial" : "error")
+      })
+    }
+    
     loadProducts()
   }
 
@@ -368,8 +385,10 @@ export default function EstoquePage() {
             fileName={`estoque-${new Date().toISOString().split('T')[0]}`}
             title="Relatório de Estoque"
             importModule="estoque"
-            fullData={allProducts}
             onImportConfirm={handleImportConfirm}
+            exportPermissionKey="products.export"
+            importPermissionKey="products.import"
+            moduleName="produtos"
           />
         </div>
       </div>

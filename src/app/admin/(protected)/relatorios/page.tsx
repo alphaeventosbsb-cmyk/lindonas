@@ -291,6 +291,8 @@ export default function RelatoriosPage() {
               fileName={exportConfig.fileName}
               title={exportConfig.title}
               hideImport={true}
+              exportPermissionKey="reports.export"
+              moduleName="relatorios"
             />
             <button onClick={handlePrint} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.625rem 1rem', borderRadius: '0.75rem', border: '1px solid #e5e7eb', background: '#fff', color: '#374151', fontWeight: 600, fontSize: '0.8125rem', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
               <Printer style={{ width: '1rem', height: '1rem' }} /> Imprimir Tela

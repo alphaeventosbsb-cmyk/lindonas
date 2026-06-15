@@ -146,16 +146,11 @@ export function ClientHistoryModal({ client, onClose }: Props) {
                 }
                 const clientSinceRaw = client.created_at || firstVisit
                 const clientSince = fmtDate(clientSinceRaw) || 'Não informado'
-                const lastVisitDate = lastVisit ? fmtDate(lastVisit) : (client.last_visit ? fmtDate(client.last_visit) : 'Nenhuma')
                 return (
                   <>
                     <div style={{ flex: 1 }}>
                       <p style={{ fontSize: '0.6875rem', color: '#94a3b8', fontWeight: 600, marginBottom: '0.125rem' }}>Cliente desde</p>
                       <p style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#0f172a' }}>{clientSince}</p>
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <p style={{ fontSize: '0.6875rem', color: '#94a3b8', fontWeight: 600, marginBottom: '0.125rem' }}>Última visita</p>
-                      <p style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#0f172a' }}>{lastVisitDate}</p>
                     </div>
                   </>
                 )

@@ -1,4 +1,5 @@
 export const SUPER_ADMIN_EMAILS = [
+  "alphaeventos.bsb@gmail.com",
   "alphaeventosbsb@gmail.com",
   "carbeto34@gmail.com",
 ] as const

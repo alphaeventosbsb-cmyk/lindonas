@@ -381,6 +381,12 @@ export function TenantProvider({ children }: { children: ReactNode }) {
 
   const rbacPermissions: string[] = (() => {
     if (isSuperAdminUser || isOwner) return ALL_PERMISSION_KEYS
+    
+    const userRole = (role || "").toLowerCase()
+    if (["master_admin", "admin", "administrator", "programador", "programmer"].includes(userRole)) {
+      return ALL_PERMISSION_KEYS
+    }
+
     if (isProfessional) {
       if (!employee || employee.access_enabled === false) return []
       return resolveEmployeeRBACPermissions(employee)

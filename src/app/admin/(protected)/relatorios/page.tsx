@@ -4,7 +4,8 @@ import { useEffect, useState } from "react"
 import { fetchCollection } from "@/lib/firebase/client-utils"
 import type { Appointment, Service, Employee, Client, FinancialEntry, CashRegister } from "@/lib/types/database"
 import { formatCurrency, toLocalDateStr } from "@/lib/utils"
-import { Loader2, TrendingUp, Users, DollarSign, CreditCard, AlertTriangle, Scissors, Printer, CalendarDays, ArrowRight } from "lucide-react"
+import { Loader2, TrendingUp, Users, DollarSign, CreditCard, AlertTriangle, Scissors, Printer, CalendarDays, ArrowRight, Search } from "lucide-react"
+import { toast } from "sonner"
 import { PieChart, Pie, Cell, Legend, Tooltip, ResponsiveContainer } from "recharts"
 import { PermissionGate } from "@/components/ui/permission-gate"
 import { usePermission } from "@/lib/rbac/usePermission"
@@ -36,13 +37,37 @@ export default function RelatoriosPage() {
   
   const [activeTab, setActiveTab] = useState<ReportTab>(availableTabs.length > 0 ? availableTabs[0].id : "revenue")
   
-  // Period filter
   const [periodStart, setPeriodStart] = useState(() => {
     const n = new Date(); return toLocalDateStr(new Date(n.getFullYear(), n.getMonth(), 1))
   })
   const [periodEnd, setPeriodEnd] = useState(() => {
     const n = new Date(); return toLocalDateStr(new Date(n.getFullYear(), n.getMonth() + 1, 0))
   })
+
+  const [inputStart, setInputStart] = useState(periodStart)
+  const [inputEnd, setInputEnd] = useState(periodEnd)
+  const [isSearching, setIsSearching] = useState(false)
+
+  const handleSearch = () => {
+    if (inputStart > inputEnd) {
+      toast.error("A data inicial não pode ser maior que a data final.")
+      return
+    }
+    if (!inputStart || !inputEnd) {
+      toast.warning("Por favor, preencha ambas as datas.")
+      return
+    }
+    setIsSearching(true)
+    setTimeout(() => {
+      setPeriodStart(inputStart)
+      setPeriodEnd(inputEnd)
+      setIsSearching(false)
+    }, 400)
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') handleSearch()
+  }
 
   // Modal State
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
@@ -224,11 +249,26 @@ export default function RelatoriosPage() {
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
           <div>
             <label style={{ display: 'block', fontSize: '0.6875rem', fontWeight: 700, color: '#8b8fa7', marginBottom: '0.375rem', textTransform: 'uppercase' }}>Período De</label>
-            <input type="date" value={periodStart} onChange={e => setPeriodStart(e.target.value)} style={inputStyle} />
+            <input type="date" value={inputStart} onChange={e => setInputStart(e.target.value)} onKeyDown={handleKeyDown} style={inputStyle} />
           </div>
           <div>
             <label style={{ display: 'block', fontSize: '0.6875rem', fontWeight: 700, color: '#8b8fa7', marginBottom: '0.375rem', textTransform: 'uppercase' }}>Até</label>
-            <input type="date" value={periodEnd} onChange={e => setPeriodEnd(e.target.value)} style={inputStyle} />
+            <input type="date" value={inputEnd} onChange={e => setInputEnd(e.target.value)} onKeyDown={handleKeyDown} style={inputStyle} />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+            <button 
+              onClick={handleSearch} 
+              disabled={isSearching} 
+              title="Pesquisar período"
+              style={{ 
+                height: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', 
+                padding: '0 1rem', borderRadius: '0.75rem', border: 'none', background: '#7c5cfc', color: '#fff', 
+                fontWeight: 700, cursor: isSearching ? 'not-allowed' : 'pointer', transition: 'all 0.2s',
+                boxShadow: '0 1px 3px rgba(124,92,252,0.2)'
+              }}
+            >
+              {isSearching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+            </button>
           </div>
         </div>
         

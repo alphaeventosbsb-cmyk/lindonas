@@ -1,12 +1,10 @@
 "use client"
 import { useEffect, useState } from "react"
 import { Calendar, Phone } from "lucide-react"
-import { fetchCollection } from "@/lib/firebase/client-utils"
 import type { BusinessSettings } from "@/lib/types/database"
 
 export function PublicHeader({ companySlug }: { companySlug?: string }) {
   const [settings, setSettings] = useState<BusinessSettings | null>(null)
-  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     async function loadSettings() {

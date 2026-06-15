@@ -6,7 +6,7 @@ import type { Service, Category, Product, ServiceProduct } from "@/lib/types/dat
 import { Loader2, X, Image as ImageIcon, Plus, Trash2, Tag, Percent, Scissors, CircleDollarSign, PackageSearch } from "lucide-react"
 import { toast } from "sonner"
 import { fetchCollectionWhere, fetchCollection } from "@/lib/firebase/client-utils"
-import { formatCurrency } from "@/lib/utils"
+
 import { ExpandableImage } from "@/components/ui/expandable-image"
 import { useTenant } from "@/lib/auth/tenant-context"
 

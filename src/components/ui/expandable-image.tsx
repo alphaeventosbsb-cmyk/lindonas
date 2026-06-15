@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect } from "react"
 import { X, ZoomIn } from "lucide-react"
 
 interface ExpandableImageProps extends React.ImgHTMLAttributes<HTMLImageElement> {

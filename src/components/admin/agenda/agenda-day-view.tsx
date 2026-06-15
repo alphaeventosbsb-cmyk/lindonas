@@ -702,6 +702,23 @@ function ProfessionalColumn({ employee, appointments, isToday, currentTimePos, o
   const breakStart = scheduleForDay?.breakStart || null
   const breakEnd = scheduleForDay?.breakEnd || null
 
+  // Helper: check if a given time slot falls within lunch or break
+  const isInLunchOrBreak = (slotTime: string): 'lunch' | 'break' | null => {
+    const [sh, sm] = slotTime.split(':').map(Number)
+    const slotMins = sh * 60 + sm
+    if (lunchStart && lunchEnd) {
+      const [lsH, lsM] = lunchStart.split(':').map(Number)
+      const [leH, leM] = lunchEnd.split(':').map(Number)
+      if (slotMins >= lsH * 60 + lsM && slotMins < leH * 60 + leM) return 'lunch'
+    }
+    if (breakStart && breakEnd) {
+      const [bsH, bsM] = breakStart.split(':').map(Number)
+      const [beH, beM] = breakEnd.split(':').map(Number)
+      if (slotMins >= bsH * 60 + bsM && slotMins < beH * 60 + beM) return 'break'
+    }
+    return null
+  }
+
   const slotMenuRef = useRef<HTMLDivElement>(null)
 
   // Close slot menu on click outside
@@ -881,13 +898,27 @@ function ProfessionalColumn({ employee, appointments, isToday, currentTimePos, o
       )}
 
       {/* Time grid lines — each is a droppable */}
-      {timeSlots.map((time, i) => (
+      {timeSlots.map((time, i) => {
+        const blockType = isInLunchOrBreak(time)
+        const blockedBg = blockType ? 'rgba(229, 231, 235, 0.55)' : null
+        const baseBg = blockedBg || (hasCut && employee ? (i % 2 === 0 ? cutBgEven : cutBgOdd) : (i % 2 === 0 ? bgEven : bgOdd))
+        return (
         <DroppableSlot
           key={time}
           id={`slot-${empId}-${time}`}
-          onClick={() => {
+          onClick={async () => {
             if (!isWorkingDay) return
             if (employee) {
+              if (blockType) {
+                const label = blockType === 'lunch' ? 'horário de almoço' : 'horário de intervalo'
+                const confirmed = await confirmFn({
+                  title: blockType === 'lunch' ? 'Horário de Almoço' : 'Horário de Intervalo',
+                  message: `Este horário (${time}) está dentro do ${label} de ${employee.name}. Deseja agendar mesmo assim?`,
+                  confirmText: 'Agendar mesmo assim',
+                  cancelText: 'Cancelar'
+                })
+                if (!confirmed) return
+              }
               store.setPrefillAppointment({
                 employee_id: employee.id,
                 appointment_time: time,
@@ -901,37 +932,33 @@ function ProfessionalColumn({ employee, appointments, isToday, currentTimePos, o
           style={{
             height: `${slotHeight}px`,
             borderBottom: i % 2 === 1 ? '1px solid #e8ecf4' : '1px solid #f5f7fa',
-            background: hasCut && employee
-              ? (i % 2 === 0 ? cutBgEven : cutBgOdd)
-              : (i % 2 === 0 ? bgEven : bgOdd),
+            background: baseBg,
             cursor: hasCut ? 'copy' : 'pointer',
             transition: 'background 0.1s',
           }}
           onMouseEnter={e => {
-            (e.currentTarget as HTMLElement).style.background = hasCut ? '#ede9fe' : hoverBg
+            (e.currentTarget as HTMLElement).style.background = hasCut ? '#ede9fe' : (blockType ? 'rgba(229, 231, 235, 0.7)' : hoverBg)
           }}
           onMouseLeave={e => {
-            (e.currentTarget as HTMLElement).style.background = hasCut && employee
-              ? (i % 2 === 0 ? cutBgEven : cutBgOdd)
-              : (i % 2 === 0 ? bgEven : bgOdd)
+            (e.currentTarget as HTMLElement).style.background = baseBg
           }}
         />
-      ))}
+      )})}
 
       {/* Lunch break overlay */}
       {lunchStart && lunchEnd && (
         <div style={{
           position: 'absolute',
           top: `${getCardPosition(lunchStart)}px`,
-          left: '4px', right: '4px',
+          left: '2px', right: '2px',
           height: `${getCardPosition(lunchEnd) - getCardPosition(lunchStart)}px`,
-          background: 'repeating-linear-gradient(45deg, transparent, transparent 5px, rgba(0,0,0,0.02) 5px, rgba(0,0,0,0.02) 10px)',
+          background: 'repeating-linear-gradient(45deg, rgba(249,115,22,0.06), rgba(249,115,22,0.06) 6px, rgba(249,115,22,0.12) 6px, rgba(249,115,22,0.12) 12px)',
           borderRadius: '0.375rem',
-          border: '1px dashed #e2e8f0',
+          border: '1.5px dashed rgba(249,115,22,0.4)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          pointerEvents: 'none', zIndex: 1,
+          pointerEvents: 'none', zIndex: 2,
         }}>
-          <span style={{ fontSize: '0.5625rem', color: '#9ca3af', fontWeight: 600 }}>
+          <span style={{ fontSize: '0.5625rem', color: '#ea580c', fontWeight: 700, background: 'rgba(255,255,255,0.85)', padding: '1px 6px', borderRadius: '4px' }}>
             🍽️ Almoço
           </span>
         </div>
@@ -942,15 +969,15 @@ function ProfessionalColumn({ employee, appointments, isToday, currentTimePos, o
         <div style={{
           position: 'absolute',
           top: `${getCardPosition(breakStart)}px`,
-          left: '4px', right: '4px',
+          left: '2px', right: '2px',
           height: `${getCardPosition(breakEnd) - getCardPosition(breakStart)}px`,
-          background: 'repeating-linear-gradient(45deg, transparent, transparent 5px, rgba(0,0,0,0.02) 5px, rgba(0,0,0,0.02) 10px)',
+          background: 'repeating-linear-gradient(45deg, rgba(99,102,241,0.06), rgba(99,102,241,0.06) 6px, rgba(99,102,241,0.12) 6px, rgba(99,102,241,0.12) 12px)',
           borderRadius: '0.375rem',
-          border: '1px dashed #e2e8f0',
+          border: '1.5px dashed rgba(99,102,241,0.4)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          pointerEvents: 'none', zIndex: 1,
+          pointerEvents: 'none', zIndex: 2,
         }}>
-          <span style={{ fontSize: '0.5625rem', color: '#9ca3af', fontWeight: 600 }}>
+          <span style={{ fontSize: '0.5625rem', color: '#4f46e5', fontWeight: 700, background: 'rgba(255,255,255,0.85)', padding: '1px 6px', borderRadius: '4px' }}>
             ☕ Intervalo
           </span>
         </div>

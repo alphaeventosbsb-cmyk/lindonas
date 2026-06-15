@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { subscribeCollection } from "@/lib/firebase/client-utils"
 import type { CustomRBACProfile } from "@/lib/types/database"
-import { PROFILE_OPTIONS, RBACProfile } from "./rbac-types"
+import { PROFILE_OPTIONS } from "./rbac-types"
 
 export interface CombinedProfile {
   id: string

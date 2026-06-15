@@ -1,6 +1,6 @@
 "use client"
 
-import { Calendar, Scissors, User, CalendarDays, Clock, UserCheck, ClipboardCheck, Check } from "lucide-react"
+import { Scissors, User, CalendarDays, Clock, UserCheck, ClipboardCheck, Check } from "lucide-react"
 
 const stepsMeta = [
   { icon: Scissors, label: "Serviço" },

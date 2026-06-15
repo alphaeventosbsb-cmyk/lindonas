@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react"
 import type { Category, Service } from "@/lib/types/database"
-import { formatCurrency, formatDuration } from "@/lib/utils"
+import { formatCurrency } from "@/lib/utils"
 import { ExpandableImage } from "@/components/ui/expandable-image"
 import { Clock, ArrowRight, Search, Sparkles, ChevronDown } from "lucide-react"
 
@@ -17,7 +17,7 @@ interface Props {
 
 const PAGE_SIZE = 9
 
-export function ServiceSelection({ categories, services, selectedService, selectedCategory, onSelect, onNext }: Props) {
+export function ServiceSelection({ categories, services, selectedService, selectedCategory: _selectedCategory, onSelect, onNext }: Props) {
   const [search, setSearch] = useState("")
   const [activeTab, setActiveTab] = useState("todos")
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)

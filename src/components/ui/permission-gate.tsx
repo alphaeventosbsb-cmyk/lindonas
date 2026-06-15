@@ -11,7 +11,7 @@ interface Props {
 }
 
 export function PermissionGate({ permission, mode = "any", children, fallback = null }: Props) {
-  const { can, canAny, canAll } = usePermission()
+  const { canAny, canAll } = usePermission()
 
   const keys = Array.isArray(permission) ? permission : [permission]
   const allowed = mode === "all" ? canAll(keys) : canAny(keys)

@@ -2,7 +2,7 @@
 
 import { useState, useRef, useMemo } from "react"
 import { X, Upload, File as FileIcon, AlertCircle, Loader2, ChevronDown, FileSpreadsheet } from "lucide-react"
-import { parseImportFile, validateImportRows, mapImportColumns } from "@/lib/export-utils"
+import { parseImportFile, validateImportRows, mapImportColumns, CsvSeparatorOption } from "@/lib/export-utils"
 
 interface ImportPreviewModalProps {
   moduleType: "clientes" | "estoque" | "servicos"
@@ -27,6 +27,7 @@ export function ImportPreviewModal({ moduleType, onClose, fullData, onConfirm }:
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [csvSeparator, setCsvSeparator] = useState<CsvSeparatorOption>("auto")
   
   const [file, setFile] = useState<File | null>(null)
   const [rawValidData, setRawValidData] = useState<Record<string, unknown>[]>([])
@@ -61,7 +62,14 @@ export function ImportPreviewModal({ moduleType, onClose, fullData, onConfirm }:
     }
   }
 
-  const processFile = async (selectedFile: File) => {
+  const handleSeparatorChange = async (val: CsvSeparatorOption) => {
+    setCsvSeparator(val)
+    if (file) {
+      await processFile(file, val)
+    }
+  }
+
+  const processFile = async (selectedFile: File, sepOverride: CsvSeparatorOption = csvSeparator) => {
     setError(null)
     const ext = selectedFile.name.split('.').pop()?.toLowerCase()
     if (!['xlsx', 'xls', 'csv'].includes(ext || '')) {
@@ -76,7 +84,7 @@ export function ImportPreviewModal({ moduleType, onClose, fullData, onConfirm }:
 
     setLoading(true)
     try {
-      const data = await parseImportFile(selectedFile)
+      const data = await parseImportFile(selectedFile, sepOverride)
       const { valid, errors } = validateImportRows(data)
 
       if (errors.length > 0) {
@@ -370,6 +378,30 @@ export function ImportPreviewModal({ moduleType, onClose, fullData, onConfirm }:
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              {file?.name.toLowerCase().endsWith('.csv') && (
+                <div className="mb-6">
+                  {mappedKeys.length === 1 && csvSeparator === 'auto' && (
+                    <div className="p-3 mb-3 bg-yellow-50 text-yellow-800 border border-yellow-200 rounded-md text-sm flex items-start gap-2">
+                      <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                      <p>Não foi possível identificar o separador automaticamente. Escolha abaixo como deseja ler este CSV.</p>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-3 text-sm">
+                    <label className="font-medium text-gray-700">Como deseja ler este CSV?</label>
+                    <select 
+                      value={csvSeparator} 
+                      onChange={(e) => handleSeparatorChange(e.target.value as CsvSeparatorOption)}
+                      className="border-gray-300 rounded-md text-sm py-1.5 pl-3 pr-8 focus:ring-2 focus:ring-[#7c5cfc]/20 focus:border-[#7c5cfc] outline-none border bg-white"
+                    >
+                      <option value="auto">Detectar automaticamente</option>
+                      <option value=";">Separado por ponto e vírgula (;)</option>
+                      <option value=",">Separado por vírgula (,)</option>
+                      <option value="\t">Separado por tabulação</option>
+                      <option value="single">Tratar como uma única coluna</option>
+                    </select>
+                  </div>
+                </div>
+              )}
               {['clientes', 'estoque'].includes(moduleType) && mappedKeys.length > 0 && (
                 <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '0.5rem', padding: '1rem' }}>
                   <h4 style={{ margin: '0 0 0.75rem', fontSize: '0.875rem', fontWeight: 600, color: '#334155' }}>Mapeamento de Colunas</h4>

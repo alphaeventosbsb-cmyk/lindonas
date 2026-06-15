@@ -135,7 +135,9 @@ export async function exportToPDF<T>(
 // PREPARAÇÃO PARA FUTURA IMPORTAÇÃO (FASE 1: SEM SALVAR DADOS NO BANCO)
 // --------------------------------------------------------------------------------
 
-function parseCsvText(csvText: string): Record<string, unknown>[] {
+export type CsvSeparatorOption = "auto" | ";" | "," | "\t" | "single"
+
+function parseCsvText(csvText: string, separatorOverride: CsvSeparatorOption = "auto"): Record<string, unknown>[] {
   let text = csvText;
   if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
 
@@ -176,22 +178,32 @@ function parseCsvText(csvText: string): Record<string, unknown>[] {
 
   const separators = [';', ',', '\t', '|'];
   let bestSep = ';';
-  let maxCols = 0;
 
-  for (const sep of separators) {
-    const cols = parseLine(lines[0], sep).length;
-    if (cols > maxCols) {
-      maxCols = cols;
-      bestSep = sep;
+  if (separatorOverride !== "auto") {
+    if (separatorOverride === "single") {
+      bestSep = '\0'; // no separator
+    } else {
+      bestSep = separatorOverride;
+    }
+  } else {
+    let maxCols = 0;
+    for (const sep of separators) {
+      const cols = parseLine(lines[0], sep).length;
+      if (cols > maxCols) {
+        maxCols = cols;
+        bestSep = sep;
+      }
+    }
+
+    let headers = parseLine(lines[0], bestSep).map(h => h.trim());
+    if (headers.length === 1) {
+      if (headers[0].includes(';')) bestSep = ';';
+      else if (headers[0].includes(',')) bestSep = ',';
     }
   }
 
-  let headers = parseLine(lines[0], bestSep).map(h => h.trim());
-  if (headers.length === 1) {
-    if (headers[0].includes(';')) bestSep = ';';
-    else if (headers[0].includes(',')) bestSep = ',';
-    headers = parseLine(lines[0], bestSep).map(h => h.trim());
-  }
+  const headersObj = parseLine(lines[0], bestSep).map(h => h.trim());
+  const headers = separatorOverride === "single" ? [headersObj.join("")] : headersObj;
 
   const result: Record<string, unknown>[] = [];
   for (let i = 1; i < lines.length; i++) {
@@ -210,7 +222,7 @@ function parseCsvText(csvText: string): Record<string, unknown>[] {
   return result;
 }
 
-export async function parseImportFile(file: File): Promise<unknown[]> {
+export async function parseImportFile(file: File, separatorOverride: CsvSeparatorOption = "auto"): Promise<unknown[]> {
   return new Promise((resolve, reject) => {
     const isCsv = file.name.toLowerCase().endsWith('.csv')
     
@@ -219,7 +231,7 @@ export async function parseImportFile(file: File): Promise<unknown[]> {
       reader.onload = (e) => {
         try {
           const text = e.target?.result as string
-          const parsed = parseCsvText(text)
+          const parsed = parseCsvText(text, separatorOverride)
           resolve(parsed)
         } catch (err) {
           reject(err)
@@ -279,13 +291,6 @@ export function validateImportRows(data: unknown[]): { valid: unknown[], errors:
   const errors = []
   if (data.length === 0) errors.push("O arquivo está vazio ou não possui cabeçalhos.")
   if (valid.length === 0 && data.length > 0) errors.push("Nenhuma linha de dados válida encontrada.")
-  
-  if (valid.length > 0 && errors.length === 0) {
-    const sampleKeys = Object.keys(valid[0] as Record<string, unknown>);
-    if (sampleKeys.length === 1) {
-      errors.push("CSV não separado corretamente. Tente salvar como CSV separado por ponto e vírgula ou use arquivo Excel .xlsx.")
-    }
-  }
 
   return { valid, errors }
 }

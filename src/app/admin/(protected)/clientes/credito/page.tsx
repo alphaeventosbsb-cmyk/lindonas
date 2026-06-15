@@ -63,22 +63,15 @@ export default function CreditoClientePage() {
 
   const totalCredit = clients.reduce((sum, c) => sum + (c.credit_amount || 0), 0)
 
-  const exportData = transactions.filter(tx => 
-    filtered.some(c => c.id === tx.client_id)
-  )
-
   const exportConfig = {
-    title: `Transações de Crédito de Clientes`,
-    fileName: `transacoes_credito`,
-    data: exportData,
+    title: `Clientes com Saldo de Crédito`,
+    fileName: `clientes_credito`,
+    data: filtered,
     columns: [
-      { header: "Cliente", key: "client_id", format: (v: any) => clients.find(c => c.id === v)?.name || "Desconhecido" },
-      { header: "Tipo", key: "type", format: (v: any) => v === "credit" ? "Adicionado" : "Utilizado" },
-      { header: "Valor", key: "amount", format: (v: any) => formatCurrency(Number(v)) },
-      { header: "Observações", key: "notes", format: (v: any) => v || "—" },
-      { header: "Data", key: "created_at", format: (v: any) => new Date(String(v)).toLocaleString('pt-BR') },
-      { header: "Responsável", key: "created_by_name", format: (v: any) => v || "Sistema" },
-      { header: "Origem", key: "origin", format: (v: any) => v || "—" }
+      { header: "Cliente", key: "name" },
+      { header: "Telefone", key: "phone", format: (v: any) => v || "—" },
+      { header: "CPF", key: "cpf", format: (v: any) => v || "—" },
+      { header: "Saldo de Crédito", key: "credit_amount", format: (v: any) => formatCurrency(Number(v)) }
     ]
   }
 

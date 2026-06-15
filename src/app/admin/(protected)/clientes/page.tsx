@@ -141,13 +141,14 @@ export default function ClientesPage() {
         const birthCol = Object.keys(columnMapping).find(k => columnMapping[k] === "birth_date")
         const notesCol = Object.keys(columnMapping).find(k => columnMapping[k] === "notes")
 
-        const name = nameCol ? String(row[nameCol] || "").trim() : ""
+        const name = row._generatedName ? String(row._generatedName) : (nameCol ? String(row[nameCol] || "").trim() : "")
         const phone = phoneCol ? String(row[phoneCol] || "").replace(/\D/g, "") : ""
         const email = emailCol ? String(row[emailCol] || "").trim().toLowerCase() : ""
         const cpf = cpfCol ? String(row[cpfCol] || "").replace(/\D/g, "") : ""
         const addressText = addressCol ? String(row[addressCol] || "").trim() : ""
         const birthDateStr = birthCol ? String(row[birthCol] || "").trim() : ""
-        const notesText = notesCol ? String(row[notesCol] || "").trim() : ""
+        const rawNotes = notesCol ? String(row[notesCol] || "").trim() : ""
+        const notesText = rawNotes + (row._generatedNotes ? (rawNotes ? `\n\n` : "") + String(row._generatedNotes) : "")
 
         let birthDate = null
         if (birthDateStr) {

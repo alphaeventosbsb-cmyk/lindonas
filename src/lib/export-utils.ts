@@ -207,7 +207,7 @@ export function mapImportColumns(row: unknown, moduleType?: "clientes" | "estoqu
   keys.forEach(k => {
     const cleanK = sanitizeColumnName(k)
     // Common
-    if (cleanK === 'nome' || cleanK === 'cliente' || cleanK === 'produto' || cleanK === 'servico' || cleanK === 'titulo') mapping.name = k
+    if (cleanK === 'nome' || cleanK === 'cliente' || cleanK === 'nome cliente' || cleanK === 'nome do cliente' || cleanK === 'nome completo' || cleanK === 'consumidor' || cleanK === 'pessoa' || cleanK === 'titular' || cleanK === 'produto' || cleanK === 'servico' || cleanK === 'titulo') mapping.name = k
     if (cleanK.includes('status') || cleanK === 'ativo') mapping.status = k
 
     if (moduleType === "clientes") {

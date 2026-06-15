@@ -31,7 +31,7 @@ export function ImportPreviewModal({ moduleType, onClose, fullData, onConfirm }:
   const [file, setFile] = useState<File | null>(null)
   const [previewData, setPreviewData] = useState<Record<string, unknown>[]>([])
   const [processedData, setProcessedData] = useState<Record<string, unknown>[]>([])
-  const [importSummary, setImportSummary] = useState({ total: 0, valid: 0, duplicate: 0, error: 0, toCreate: 0 })
+  const [importSummary, setImportSummary] = useState({ total: 0, valid: 0, duplicate: 0, error: 0, warning: 0, toCreate: 0 })
   const [mappedKeys, setMappedKeys] = useState<string[]>([])
   const [columnMapping, setColumnMapping] = useState<Record<string, string>>({})
 
@@ -107,7 +107,10 @@ export function ImportPreviewModal({ moduleType, onClose, fullData, onConfirm }:
       const processed = valid.map((row: Record<string, unknown>) => {
         let isDuplicate = false
         let isError = false
+        let isWarning = false
         let errorMsg = ""
+        let generatedName = ""
+        let generatedNotes = ""
         
         if (moduleType === "clientes") {
           const nameCol = Object.keys(autoMap).find(k => (autoMap as Record<string, string>)[k] === "name")
@@ -116,14 +119,25 @@ export function ImportPreviewModal({ moduleType, onClose, fullData, onConfirm }:
           const cpfCol = Object.keys(autoMap).find(k => (autoMap as Record<string, string>)[k] === "cpf")
 
           const nameVal = nameCol ? String(row[nameCol] || "").trim() : ""
+          const phoneVal = phoneCol ? String(row[phoneCol] || "").replace(/\D/g, "") : ""
+          const emailVal = emailCol ? String(row[emailCol] || "").trim().toLowerCase() : ""
+          const cpfVal = cpfCol ? String(row[cpfCol] || "").replace(/\D/g, "") : ""
+
           if (!nameVal) {
-            isError = true
-            errorMsg = "Nome vazio"
-          } else {
-            const phoneVal = phoneCol ? String(row[phoneCol] || "").replace(/\D/g, "") : ""
-            const emailVal = emailCol ? String(row[emailCol] || "").trim().toLowerCase() : ""
-            const cpfVal = cpfCol ? String(row[cpfCol] || "").replace(/\D/g, "") : ""
-            
+            if (phoneVal || emailVal || cpfVal) {
+              isWarning = true
+              if (phoneVal) generatedName = `Cliente sem nome - ${phoneVal}`
+              else if (emailVal) generatedName = `Cliente sem nome - ${emailVal}`
+              else generatedName = `Cliente sem nome - CPF ${cpfVal}`
+              
+              generatedNotes = "Importado com nome vazio. Revisar cadastro manualmente."
+            } else {
+              isError = true
+              errorMsg = "linha sem dados suficientes"
+            }
+          }
+
+          if (!isError) {
             // Check internal spreadsheet duplication
             let internalDup = false
             if (cpfVal && cpfVal.length === 11) {
@@ -153,20 +167,24 @@ export function ImportPreviewModal({ moduleType, onClose, fullData, onConfirm }:
         
         return {
           ...row,
-          _status: isError ? "error" : isDuplicate ? "duplicate" : "valid",
-          _errorMsg: errorMsg
+          _status: isError ? "error" : isDuplicate ? "duplicate" : isWarning ? "warning" : "valid",
+          _errorMsg: errorMsg,
+          _generatedName: generatedName,
+          _generatedNotes: generatedNotes
         }
       })
 
-      const toCreate = processed.filter(r => r._status === "valid").length
+      const toCreate = processed.filter(r => r._status === "valid" || r._status === "warning").length
       const errorCnt = processed.filter(r => r._status === "error").length
       const dupCnt = processed.filter(r => r._status === "duplicate").length
+      const warningCnt = processed.filter(r => r._status === "warning").length
 
       setImportSummary({
         total: processed.length,
         valid: toCreate + dupCnt,
         error: errorCnt,
         duplicate: dupCnt,
+        warning: warningCnt,
         toCreate: toCreate
       })
 
@@ -310,7 +328,7 @@ export function ImportPreviewModal({ moduleType, onClose, fullData, onConfirm }:
                   </thead>
                   <tbody>
                     {previewData.map((row, i) => (
-                      <tr key={i} style={{ borderBottom: '1px solid #e2e8f0', background: row._status === 'error' ? '#fef2f2' : row._status === 'duplicate' ? '#fffbeb' : 'transparent' }}>
+                      <tr key={i} style={{ borderBottom: '1px solid #e2e8f0', background: row._status === 'error' ? '#fef2f2' : row._status === 'duplicate' ? '#fffbeb' : row._status === 'warning' ? '#fef9c3' : 'transparent' }}>
                         {mappedKeys.map(k => (
                           <td key={k} style={{ padding: '0.75rem', color: '#475569', whiteSpace: 'nowrap' }}>
                             {row[k] !== undefined && row[k] !== null ? String(row[k]) : <span style={{ color: '#cbd5e1' }}>—</span>}
@@ -319,6 +337,7 @@ export function ImportPreviewModal({ moduleType, onClose, fullData, onConfirm }:
                         <td style={{ padding: '0.75rem', color: '#475569', whiteSpace: 'nowrap', fontWeight: 600 }}>
                           {row._status === 'error' && <span style={{ color: '#ef4444' }}>Erro: {row._errorMsg}</span>}
                           {row._status === 'duplicate' && <span style={{ color: '#d97706' }}>Duplicado / Ignorado</span>}
+                          {row._status === 'warning' && <span style={{ color: '#b45309' }}>Aviso: nome vazio, será importado como {row._generatedName}</span>}
                           {row._status === 'valid' && <span style={{ color: '#10b981' }}>Válido (Criar)</span>}
                         </td>
                       </tr>
@@ -327,24 +346,34 @@ export function ImportPreviewModal({ moduleType, onClose, fullData, onConfirm }:
                 </table>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.75rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.75rem' }}>
                 <div style={{ background: '#f8fafc', padding: '0.75rem', borderRadius: '0.5rem', border: '1px solid #e2e8f0' }}>
-                  <p style={{ margin: 0, fontSize: '0.6875rem', color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>Total Lidas</p>
+                  <p style={{ margin: 0, fontSize: '0.6875rem', color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>Lidas</p>
                   <p style={{ margin: '0.25rem 0 0', fontSize: '1.25rem', fontWeight: 700, color: '#0f172a' }}>{importSummary.total}</p>
                 </div>
                 <div style={{ background: '#f0fdf4', padding: '0.75rem', borderRadius: '0.5rem', border: '1px solid #bbf7d0' }}>
-                  <p style={{ margin: 0, fontSize: '0.6875rem', color: '#166534', fontWeight: 600, textTransform: 'uppercase' }}>Serão Criados</p>
+                  <p style={{ margin: 0, fontSize: '0.6875rem', color: '#166534', fontWeight: 600, textTransform: 'uppercase' }}>Criar</p>
                   <p style={{ margin: '0.25rem 0 0', fontSize: '1.25rem', fontWeight: 700, color: '#15803d' }}>{importSummary.toCreate}</p>
                 </div>
+                <div style={{ background: '#fef9c3', padding: '0.75rem', borderRadius: '0.5rem', border: '1px solid #fde047' }}>
+                  <p style={{ margin: 0, fontSize: '0.6875rem', color: '#a16207', fontWeight: 600, textTransform: 'uppercase' }}>Avisos</p>
+                  <p style={{ margin: '0.25rem 0 0', fontSize: '1.25rem', fontWeight: 700, color: '#ca8a04' }}>{importSummary.warning}</p>
+                </div>
                 <div style={{ background: '#fffbeb', padding: '0.75rem', borderRadius: '0.5rem', border: '1px solid #fef08a' }}>
-                  <p style={{ margin: 0, fontSize: '0.6875rem', color: '#854d0e', fontWeight: 600, textTransform: 'uppercase' }}>Duplicados (Ignorados)</p>
+                  <p style={{ margin: 0, fontSize: '0.6875rem', color: '#854d0e', fontWeight: 600, textTransform: 'uppercase' }}>Ignorados</p>
                   <p style={{ margin: '0.25rem 0 0', fontSize: '1.25rem', fontWeight: 700, color: '#a16207' }}>{importSummary.duplicate}</p>
                 </div>
                 <div style={{ background: '#fef2f2', padding: '0.75rem', borderRadius: '0.5rem', border: '1px solid #fecaca' }}>
-                  <p style={{ margin: 0, fontSize: '0.6875rem', color: '#991b1b', fontWeight: 600, textTransform: 'uppercase' }}>Erros (Ignorados)</p>
+                  <p style={{ margin: 0, fontSize: '0.6875rem', color: '#991b1b', fontWeight: 600, textTransform: 'uppercase' }}>Erros</p>
                   <p style={{ margin: '0.25rem 0 0', fontSize: '1.25rem', fontWeight: 700, color: '#b91c1c' }}>{importSummary.error}</p>
                 </div>
               </div>
+
+              {importSummary.warning > 0 && moduleType === "clientes" && (
+                <div style={{ marginTop: '0.75rem', background: '#fef9c3', border: '1px solid #fde047', borderRadius: '0.5rem', padding: '0.75rem', fontSize: '0.8125rem', color: '#854d0e' }}>
+                  <strong>Atenção:</strong> {importSummary.warning} clientes com nome vazio serão importados com um nome provisório (ex: &quot;Cliente sem nome - Telefone&quot;) para revisão manual.
+                </div>
+              )}
 
               {moduleType !== "clientes" && (
                 <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '0.75rem', padding: '1rem', display: 'flex', gap: '0.75rem' }}>

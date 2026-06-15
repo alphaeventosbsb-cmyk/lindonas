@@ -129,12 +129,6 @@ export function AgendaDayView({ onStatusChange, onAction, onMove }: Props) {
     if (maxHour > 24) maxHour = 24
     if (minHour >= maxHour) { minHour = 8; maxHour = 18 }
 
-    // Expand bounds to fill viewport better only when expanded
-    if (store.expanded) {
-      minHour = Math.min(minHour, 7)
-      maxHour = Math.max(maxHour, 22)
-    }
-
     return { start: minHour, end: maxHour }
   }, [store.businessHours, selectedDate, dayAppointments, store.expanded])
 

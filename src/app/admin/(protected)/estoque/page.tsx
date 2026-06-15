@@ -172,6 +172,108 @@ export default function EstoquePage() {
   // Filter products by current company, allowing legacy ones
   const products = allProducts.filter(p => !p.company_id || p.company_id === companyId)
 
+  const handleImportConfirm = async (
+    dataToImport: Record<string, unknown>[],
+    mappedKeys: string[],
+    columnMapping: Record<string, string>
+  ) => {
+    let successCount = 0
+    let failCount = 0
+
+    const validRows = dataToImport.filter(r => r._status === "valid" || r._status === "warning")
+    if (validRows.length === 0) return
+
+    for (const row of validRows) {
+      try {
+        const nameCol = Object.keys(columnMapping).find(k => columnMapping[k] === "name")
+        const categoryCol = Object.keys(columnMapping).find(k => columnMapping[k] === "category")
+        const skuCol = Object.keys(columnMapping).find(k => columnMapping[k] === "sku")
+        const barcodeCol = Object.keys(columnMapping).find(k => columnMapping[k] === "barcode")
+        const qtyCol = Object.keys(columnMapping).find(k => columnMapping[k] === "stock_quantity")
+        const minStockCol = Object.keys(columnMapping).find(k => columnMapping[k] === "min_stock")
+        const unitCol = Object.keys(columnMapping).find(k => columnMapping[k] === "unit")
+        const costCol = Object.keys(columnMapping).find(k => columnMapping[k] === "cost_price")
+        const sellCol = Object.keys(columnMapping).find(k => columnMapping[k] === "sell_price")
+        const supplierCol = Object.keys(columnMapping).find(k => columnMapping[k] === "supplier")
+        const manufacturerCol = Object.keys(columnMapping).find(k => columnMapping[k] === "manufacturer")
+        const statusCol = Object.keys(columnMapping).find(k => columnMapping[k] === "status")
+
+        const nameVal = nameCol ? String(row[nameCol] || "").trim() : ""
+        const categoryVal = categoryCol ? String(row[categoryCol] || "").trim() : null
+        const skuVal = skuCol ? String(row[skuCol] || "").trim() : null
+        const barcodeVal = barcodeCol ? String(row[barcodeCol] || "").trim() : null
+        const unitVal = unitCol ? String(row[unitCol] || "").trim() || "un" : "un"
+        const supplierVal = supplierCol ? String(row[supplierCol] || "").trim() : null
+        const manufacturerVal = manufacturerCol ? String(row[manufacturerCol] || "").trim() : null
+
+        const parseBrazilianNum = (val: string) => {
+          if (!val) return 0
+          const clean = val.replace(/[R$\s]/g, "")
+          if (clean.includes(",") && clean.includes(".")) {
+            return parseFloat(clean.replace(/\./g, "").replace(",", "."))
+          } else if (clean.includes(",")) {
+            return parseFloat(clean.replace(",", "."))
+          }
+          return parseFloat(clean)
+        }
+
+        const costVal = costCol ? parseBrazilianNum(String(row[costCol] || "")) : 0
+        const sellVal = sellCol ? parseBrazilianNum(String(row[sellCol] || "")) : null
+        const qtyVal = qtyCol ? parseBrazilianNum(String(row[qtyCol] || "")) : 0
+        const minStockVal = minStockCol ? parseBrazilianNum(String(row[minStockCol] || "")) : 1
+
+        const activeStr = statusCol ? String(row[statusCol] || "").toLowerCase() : ""
+        let isActive = true
+        if (activeStr === "inativo" || activeStr === "falso" || activeStr === "false" || activeStr === "0" || qtyVal <= 0) {
+          isActive = false
+        }
+
+        const finalName = nameVal || String(row._generatedName || "Produto sem nome")
+
+        const newProd = await createDocument("products", {
+          company_id: companyId,
+          name: finalName,
+          category: categoryVal,
+          sku: skuVal,
+          barcode: barcodeVal,
+          unit: unitVal,
+          cost_price: costVal,
+          sell_price: sellVal,
+          stock_quantity: qtyVal,
+          min_stock: minStockVal,
+          supplier: supplierVal,
+          manufacturer: manufacturerVal,
+          is_active: isActive
+        })
+
+        if (qtyVal > 0) {
+          await createDocument("inventory_movements", {
+            company_id: companyId,
+            product_id: newProd.id,
+            appointment_id: null,
+            service_id: null,
+            quantity: qtyVal,
+            unit: unitVal,
+            type: "in",
+            reason: "Estoque inicial (Importação)",
+            created_by_id: (saasUser as any)?.id || null,
+            created_by_name: saasUser?.name || null,
+          })
+        }
+
+        successCount++
+      } catch (err) {
+        console.error("Erro importando linha:", err)
+        failCount++
+      }
+    }
+
+    if (successCount > 0) toast.success(`${successCount} produto(s) importado(s) com sucesso!`)
+    if (failCount > 0) toast.error(`${failCount} falharam.`)
+    
+    loadProducts()
+  }
+
   const filtered = products.filter(p => p.name.toLowerCase().includes(search.toLowerCase()) || p.manufacturer?.toLowerCase().includes(search.toLowerCase()))
   
   const totalValue = products.reduce((acc, p) => acc + (p.cost_price * p.stock_quantity), 0)
@@ -180,11 +282,15 @@ export default function EstoquePage() {
 
   const exportColumns: ColumnDef<Product>[] = [
     { header: "Nome", key: "name" },
+    { header: "Categoria", key: "category", format: (v) => v || "—" },
     { header: "SKU", key: "sku", format: (v) => v || "—" },
+    { header: "Cód. Barras", key: "barcode", format: (v) => v || "—" },
     { header: "Estoque", key: "stock_quantity", format: (v, row) => `${v} ${row.unit || ""}`.trim() },
     { header: "Min.", key: "min_stock", format: (v) => v || "1" },
     { header: "Custo", key: "cost_price", format: formatCurrencyForExport },
-    { header: "Venda", key: "sale_price", format: formatCurrencyForExport },
+    { header: "Venda", key: "sell_price", format: formatCurrencyForExport },
+    { header: "Fornecedor", key: "supplier", format: (v) => v || "—" },
+    { header: "Marca", key: "manufacturer", format: (v) => v || "—" },
     { header: "Status", key: "is_active", format: (v) => v ? "Ativo" : "Inativo" }
   ]
 
@@ -262,6 +368,8 @@ export default function EstoquePage() {
             fileName={`estoque-${new Date().toISOString().split('T')[0]}`}
             title="Relatório de Estoque"
             importModule="estoque"
+            fullData={allProducts}
+            onImportConfirm={handleImportConfirm}
           />
         </div>
       </div>

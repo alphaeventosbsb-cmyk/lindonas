@@ -22,6 +22,9 @@ export function ProductFormModal({ product, onClose, onSave }: ProductFormModalP
 
   const [form, setForm] = useState({
     name: product?.name || "",
+    category: product?.category || "",
+    sku: product?.sku || "",
+    barcode: product?.barcode || "",
     unit: product?.unit || "un",
     cost_price: product?.cost_price ? String(product.cost_price) : "",
     sell_price: product?.sell_price ? String(product.sell_price) : "",
@@ -57,6 +60,9 @@ export function ProductFormModal({ product, onClose, onSave }: ProductFormModalP
 
       await onSave({
         name: form.name,
+        category: form.category || null,
+        sku: form.sku || null,
+        barcode: form.barcode || null,
         unit: form.unit,
         cost_price: parseFloat(form.cost_price.replace(',', '.')) || 0,
         sell_price: form.sell_price ? parseFloat(form.sell_price.replace(',', '.')) : null,
@@ -116,6 +122,21 @@ export function ProductFormModal({ product, onClose, onSave }: ProductFormModalP
               
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div>
+                  <label style={labelStyle}>Categoria</label>
+                  <input type="text" value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} style={inputStyle} placeholder="Ex: Cabelos" />
+                </div>
+                <div>
+                  <label style={labelStyle}>Código / SKU</label>
+                  <input type="text" value={form.sku} onChange={e => setForm({ ...form, sku: e.target.value })} style={inputStyle} placeholder="Ex: SH-100" />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label style={labelStyle}>Código de Barras</label>
+                  <input type="text" value={form.barcode} onChange={e => setForm({ ...form, barcode: e.target.value })} style={inputStyle} placeholder="Ex: 7891234567890" />
+                </div>
+                <div>
                   <label style={labelStyle}>Unidade de Medida</label>
                   <select value={form.unit} onChange={e => setForm({ ...form, unit: e.target.value })} style={inputStyle}>
                     <option value="un">Unidade (un)</option>
@@ -126,6 +147,9 @@ export function ProductFormModal({ product, onClose, onSave }: ProductFormModalP
                     <option value="caixa">Caixa</option>
                   </select>
                 </div>
+              </div>
+
+              <div>
                 <div>
                   <label style={labelStyle}>Status</label>
                   <select value={form.is_active ? "active" : "inactive"} onChange={e => setForm({ ...form, is_active: e.target.value === "active" })} style={inputStyle} disabled={parseFloat(form.stock_quantity) <= 0}>

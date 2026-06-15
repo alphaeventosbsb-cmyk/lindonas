@@ -688,6 +688,9 @@ export interface Product {
   min_stock: number | null
   supplier?: string | null
   manufacturer?: string | null
+  category?: string | null
+  sku?: string | null
+  barcode?: string | null
   is_active: boolean
   created_at: string
   updated_at: string

@@ -90,9 +90,9 @@ export function ImportPreviewModal({ moduleType, onClose, fullData, onConfirm }:
       previewInitial.forEach(row => Object.keys(row).forEach(k => allKeys.add(k)))
       const keysArray = Array.from(allKeys)
       
-      let autoMap: Record<string, string> = {}
+      const autoMap: Record<string, string> = {}
       if (previewInitial.length > 0) {
-        const rawAutoMap = mapImportColumns(previewInitial[0], moduleType)
+        const rawAutoMap = mapImportColumns(data[0] as Record<string, unknown>, moduleType)
         Object.entries(rawAutoMap).forEach(([fieldKey, colName]) => {
           autoMap[colName as string] = fieldKey
         })
@@ -173,6 +173,82 @@ export function ImportPreviewModal({ moduleType, onClose, fullData, onConfirm }:
             })
           }
         }
+      } else if (moduleType === "estoque") {
+        const nameCol = Object.keys(columnMapping).find(k => columnMapping[k] === "name")
+        const categoryCol = Object.keys(columnMapping).find(k => columnMapping[k] === "category")
+        const skuCol = Object.keys(columnMapping).find(k => columnMapping[k] === "sku")
+        const barcodeCol = Object.keys(columnMapping).find(k => columnMapping[k] === "barcode")
+        const costCol = Object.keys(columnMapping).find(k => columnMapping[k] === "cost_price")
+        const sellCol = Object.keys(columnMapping).find(k => columnMapping[k] === "sell_price")
+        
+        const nameVal = nameCol ? String(row[nameCol] || "").trim() : ""
+        const categoryVal = categoryCol ? String(row[categoryCol] || "").trim() : ""
+        const skuVal = skuCol ? String(row[skuCol] || "").trim() : ""
+        const barcodeVal = barcodeCol ? String(row[barcodeCol] || "").trim() : ""
+
+        const parseBrazilianNum = (val: string) => {
+          if (!val) return 0
+          // "R$ 1.234,56" -> "1234.56"
+          const clean = val.replace(/[R$\s]/g, "")
+          if (clean.includes(",") && clean.includes(".")) {
+            // format 1.234,56
+            return parseFloat(clean.replace(/\./g, "").replace(",", "."))
+          } else if (clean.includes(",")) {
+            // format 1234,56
+            return parseFloat(clean.replace(",", "."))
+          }
+          return parseFloat(clean)
+        }
+
+        const costVal = costCol ? parseBrazilianNum(String(row[costCol] || "")) : 0
+        const sellVal = sellCol ? parseBrazilianNum(String(row[sellCol] || "")) : 0
+
+        if (!nameVal) {
+          if (skuVal || barcodeVal) {
+            isWarning = true
+            if (skuVal) generatedName = `Produto sem nome - SKU ${skuVal}`
+            else generatedName = `Produto sem nome - Cód Barras ${barcodeVal}`
+            generatedNotes = "Importado sem nome. Revisar cadastro manualmente."
+          } else {
+            isError = true
+            errorMsg = "linha sem dados suficientes"
+          }
+        }
+
+        if (costVal < 0) { isError = true; errorMsg = "preço de custo não pode ser negativo"; }
+        if (sellVal < 0) { isError = true; errorMsg = "preço de venda não pode ser negativo"; }
+
+        if (!isError) {
+          let internalDup = false
+          const normalize = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim()
+
+          if (skuVal) {
+            if (seenCpfs.has(skuVal)) internalDup = true; else seenCpfs.add(skuVal);
+          }
+          if (barcodeVal) {
+            if (seenEmails.has(barcodeVal)) internalDup = true; else seenEmails.add(barcodeVal);
+          }
+          if (nameVal && !skuVal && !barcodeVal) {
+            const compKey = normalize(nameVal) + (categoryVal ? "||" + normalize(categoryVal) : "")
+            if (seenPhones.has(compKey)) internalDup = true; else seenPhones.add(compKey);
+          }
+
+          if (internalDup) {
+            isDuplicate = true
+          } else if (fullData && fullData.length > 0) {
+            isDuplicate = fullData.some(existing => {
+              if (skuVal && String(existing.sku || "") === skuVal) return true
+              if (barcodeVal && String(existing.barcode || "") === barcodeVal) return true
+              const existingName = normalize(String(existing.name || ""))
+              const existingCat = normalize(String(existing.category || ""))
+              const currentName = normalize(nameVal)
+              const currentCat = normalize(categoryVal)
+              if (existingName === currentName && existingCat === currentCat) return true
+              if (existingName === currentName && !existingCat && !currentCat) return true
+              return false
+            })
+          }
+        }
       }
       
       return {
@@ -213,8 +289,8 @@ export function ImportPreviewModal({ moduleType, onClose, fullData, onConfirm }:
   }
 
   const handleConfirmAction = async () => {
-    if (!onConfirm || moduleType !== "clientes") return
-    if (!window.confirm("Tem certeza que deseja importar estes clientes? Apenas os clientes com status 'Válido' serão criados no banco.")) return
+    if (!onConfirm || (moduleType !== "clientes" && moduleType !== "estoque")) return
+    if (!window.confirm(`Tem certeza que deseja importar estes ${moduleNameMap[moduleType].toLowerCase()}? Apenas as linhas com status 'Válido' serão criadas no banco.`)) return
     setSaving(true)
     try {
       await onConfirm(processedData, mappedKeys, columnMapping)
@@ -294,12 +370,21 @@ export function ImportPreviewModal({ moduleType, onClose, fullData, onConfirm }:
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-              {moduleType === "clientes" && mappedKeys.length > 0 && (
+              {['clientes', 'estoque'].includes(moduleType) && mappedKeys.length > 0 && (
                 <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '0.5rem', padding: '1rem' }}>
                   <h4 style={{ margin: '0 0 0.75rem', fontSize: '0.875rem', fontWeight: 600, color: '#334155' }}>Mapeamento de Colunas</h4>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem' }}>
-                    {['name', 'phone', 'email', 'cpf'].map(field => {
-                      const labelMap: Record<string, string> = { name: "Nome", phone: "Telefone", email: "E-mail", cpf: "CPF" }
+                  <div style={{ display: 'grid', gridTemplateColumns: moduleType === 'estoque' ? 'repeat(4, 1fr)' : 'repeat(4, 1fr)', gap: '1rem' }}>
+                    {(moduleType === 'clientes' 
+                      ? ['name', 'phone', 'email', 'cpf'] 
+                      : ['name', 'category', 'sku', 'barcode', 'stock_quantity', 'min_stock', 'unit', 'cost_price', 'sell_price', 'supplier', 'manufacturer', 'status']
+                    ).map(field => {
+                      const labelMap: Record<string, string> = { 
+                        name: "Nome", phone: "Telefone", email: "E-mail", cpf: "CPF",
+                        category: "Categoria", sku: "Código/SKU", barcode: "Cód. Barras",
+                        stock_quantity: "Quantidade", unit: "Unidade", min_stock: "Estoque Mín.",
+                        cost_price: "Preço Custo", sell_price: "Preço Venda", supplier: "Fornecedor",
+                        manufacturer: "Fabricante/Marca", status: "Status"
+                      }
                       const currentMappedCol = Object.keys(columnMapping).find(k => columnMapping[k] === field) || ""
                       
                       let exampleStr = ""
@@ -420,19 +505,19 @@ export function ImportPreviewModal({ moduleType, onClose, fullData, onConfirm }:
                 </div>
               </div>
 
-              {importSummary.warning > 0 && moduleType === "clientes" && (
+              {importSummary.warning > 0 && (
                 <div style={{ marginTop: '0.75rem', background: '#fef9c3', border: '1px solid #fde047', borderRadius: '0.5rem', padding: '0.75rem', fontSize: '0.8125rem', color: '#854d0e' }}>
-                  <strong>Atenção:</strong> {importSummary.warning} clientes com nome vazio serão importados com um nome provisório (ex: &quot;Cliente sem nome - Telefone&quot;) para revisão manual.
+                  <strong>Atenção:</strong> {importSummary.warning} {moduleType === 'clientes' ? 'clientes' : 'produtos'} com nome vazio serão importados com um nome provisório (ex: &quot;{moduleType === 'clientes' ? 'Cliente' : 'Produto'} sem nome - Código&quot;) para revisão manual.
                 </div>
               )}
 
-              {moduleType !== "clientes" && (
+              {moduleType === "servicos" && (
                 <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '0.75rem', padding: '1rem', display: 'flex', gap: '0.75rem' }}>
                   <AlertCircle style={{ width: '20px', height: '20px', color: '#d97706', flexShrink: 0 }} />
                   <div>
                     <p style={{ margin: 0, fontSize: '0.875rem', fontWeight: 600, color: '#92400e' }}>Aviso da Fase 1</p>
                     <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.8125rem', color: '#b45309' }}>
-                      Esta é apenas uma prévia. **Nada será salvo no banco de dados agora para Estoque ou Serviços.** O salvamento completo destes módulos será implementado na fase futura.
+                      Esta é apenas uma prévia. **Nada será salvo no banco de dados agora para Serviços.** O salvamento completo deste módulo será implementado na fase futura.
                     </p>
                   </div>
                 </div>
@@ -451,7 +536,7 @@ export function ImportPreviewModal({ moduleType, onClose, fullData, onConfirm }:
             Cancelar
           </button>
           
-          {moduleType === "clientes" ? (
+          {['clientes', 'estoque'].includes(moduleType) ? (
             <button 
               disabled={importSummary.toCreate === 0 || saving}
               onClick={handleConfirmAction}

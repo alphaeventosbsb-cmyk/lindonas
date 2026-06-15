@@ -196,39 +196,31 @@ export function previewImportData(_data: unknown[]) {
   // Can be used to slice top 10 items. But UI might handle this.
 }
 
-const sanitizeColumnName = (col: string) => col.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim()
-
-export function mapImportColumns(row: unknown, moduleType?: "clientes" | "estoque" | "servicos"): Record<string, string> {
+export function mapImportColumns(row: Record<string, unknown>, moduleType: "clientes" | "estoque" | "servicos"): Record<string, string> {
   const mapping: Record<string, string> = {}
-  if (!row || typeof row !== 'object' || !moduleType) return mapping
-
-  const keys = Object.keys(row)
   
-  keys.forEach(k => {
-    const cleanK = sanitizeColumnName(k)
-    // Common
-    if (cleanK === 'nome' || cleanK === 'cliente' || cleanK === 'nome cliente' || cleanK === 'nome do cliente' || cleanK === 'nome completo' || cleanK === 'consumidor' || cleanK === 'pessoa' || cleanK === 'titular' || cleanK === 'produto' || cleanK === 'servico' || cleanK === 'titulo') mapping.name = k
-    if (cleanK.includes('status') || cleanK === 'ativo') mapping.status = k
-
-    if (moduleType === "clientes") {
-      if (cleanK.includes('telefone') || cleanK.includes('celular') || cleanK.includes('whatsapp') || cleanK.includes('contato')) mapping.phone = k
-      if (cleanK === 'email' || cleanK === 'e-mail') mapping.email = k
-      if (cleanK.includes('cpf') || cleanK.includes('documento')) mapping.cpf = k
-      if (cleanK.includes('nascimento') || cleanK.includes('data de nascimento') || cleanK.includes('data nascimento')) mapping.birth_date = k
-      if (cleanK.includes('endereco') || cleanK.includes('rua') || cleanK.includes('logradouro')) mapping.address = k
-      if (cleanK.includes('obs') || cleanK.includes('observacoes') || cleanK.includes('notas')) mapping.notes = k
-    }
+  Object.keys(row).forEach(k => {
+    const cleanK = k.toLowerCase().trim()
     
-    if (moduleType === "estoque") {
-      if (cleanK.includes('categoria') || cleanK.includes('marca')) mapping.category = k
-      if (cleanK.includes('sku') || cleanK.includes('codigo') || cleanK.includes('ref')) mapping.sku = k
-      if (cleanK === 'quantidade' || cleanK === 'estoque' || cleanK === 'qtd' || cleanK.includes('estoque atual')) mapping.stock_quantity = k
-      if (cleanK.includes('preco de venda') || cleanK.includes('venda') || cleanK.includes('valor')) mapping.sale_price = k
-      if (cleanK.includes('preco de custo') || cleanK.includes('custo') || cleanK.includes('valor de custo')) mapping.cost_price = k
-      if (cleanK.includes('fornecedor')) mapping.supplier = k
-    }
-
-    if (moduleType === "servicos") {
+    if (moduleType === "clientes") {
+      if (cleanK === 'nome' || cleanK === 'cliente' || cleanK === 'nome do cliente' || cleanK === 'paciente' || cleanK === 'pessoa física' || cleanK === 'pessoa fisica') mapping.name = k
+      else if (cleanK === 'telefone' || cleanK === 'celular' || cleanK === 'whatsapp' || cleanK === 'fone' || cleanK === 'contato' || cleanK === 'tel') mapping.phone = k
+      else if (cleanK === 'email' || cleanK === 'e-mail' || cleanK === 'mail') mapping.email = k
+      else if (cleanK === 'cpf' || cleanK === 'documento' || cleanK === 'doc') mapping.cpf = k
+    } else if (moduleType === "estoque") {
+      if (cleanK === 'nome do produto' || cleanK === 'produto' || cleanK === 'nome' || cleanK === 'item' || cleanK === 'descrição' || cleanK === 'descricao') mapping.name = k
+      else if (cleanK === 'categoria' || cleanK === 'grupo' || cleanK === 'tipo') mapping.category = k
+      else if (cleanK === 'código' || cleanK === 'codigo' || cleanK === 'cod' || cleanK === 'sku' || cleanK === 'referência' || cleanK === 'referencia') mapping.sku = k
+      else if (cleanK === 'código de barras' || cleanK === 'codigo de barras' || cleanK === 'barcode' || cleanK === 'ean' || cleanK === 'gtin') mapping.barcode = k
+      else if (cleanK === 'quantidade' || cleanK === 'qtd' || cleanK === 'estoque' || cleanK === 'estoque atual' || cleanK === 'saldo') mapping.stock_quantity = k
+      else if (cleanK === 'unidade' || cleanK === 'un' || cleanK === 'medida' || cleanK === 'und') mapping.unit = k
+      else if (cleanK === 'estoque mínimo' || cleanK === 'estoque minimo' || cleanK === 'mínimo' || cleanK === 'minimo') mapping.min_stock = k
+      else if (cleanK === 'custo' || cleanK === 'preço de custo' || cleanK === 'preco de custo' || cleanK === 'valor de custo') mapping.cost_price = k
+      else if (cleanK === 'preço' || cleanK === 'preco' || cleanK === 'preço de venda' || cleanK === 'preco de venda' || cleanK === 'valor' || cleanK === 'valor de venda') mapping.sell_price = k
+      else if (cleanK === 'fornecedor') mapping.supplier = k
+      else if (cleanK === 'fabricante' || cleanK === 'marca') mapping.manufacturer = k
+      else if (cleanK === 'status' || cleanK === 'situação' || cleanK === 'situacao' || cleanK === 'ativo') mapping.status = k
+    } else if (moduleType === "servicos") {
       if (cleanK.includes('categoria')) mapping.category = k
       if (cleanK.includes('valor') || cleanK.includes('preco')) mapping.price = k
       if (cleanK.includes('duracao') || cleanK.includes('tempo') || cleanK.includes('minutos')) mapping.duration_minutes = k

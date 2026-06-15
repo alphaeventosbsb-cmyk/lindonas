@@ -15,6 +15,7 @@ import { PermissionGate } from "@/components/ui/permission-gate"
 import { ExportButtons } from "@/components/ui/export-buttons"
 import { type ColumnDef, formatCurrencyForExport } from "@/lib/export-utils"
 import { logDataAudit } from "@/lib/firebase/audit-service"
+import { createHistoryEvent } from "@/lib/firebase/history-service"
 
 export default function EstoquePage() {
   const { saasUser, companyId } = useTenant()
@@ -49,11 +50,31 @@ export default function EstoquePage() {
     try {
       if (selectedProduct) {
         await updateDocument("products", selectedProduct.id, data)
+        await createHistoryEvent({
+          client_id: null,
+          client_name: null,
+          action_type: "product_updated",
+          action_title: "Produto atualizado",
+          action_description: `Produto: ${data.name} | Quantidade: ${data.stock_quantity || 0}`,
+          performed_by_user_id: (saasUser as any)?.id || "system",
+          performed_by_name: saasUser?.name || "Sistema",
+          performed_by_email: saasUser?.email || null
+        })
         toast.success("Produto atualizado!")
       } else {
         const newProd = await createDocument("products", {
           ...data,
           company_id: companyId
+        })
+        await createHistoryEvent({
+          client_id: null,
+          client_name: null,
+          action_type: "product_created",
+          action_title: "Produto cadastrado",
+          action_description: `Produto: ${data.name} | Estoque inicial: ${data.stock_quantity || 0}`,
+          performed_by_user_id: (saasUser as any)?.id || "system",
+          performed_by_name: saasUser?.name || "Sistema",
+          performed_by_email: saasUser?.email || null
         })
         // If it was created with initial stock > 0, we should log the first movement
         if (data.stock_quantity > 0) {
@@ -108,6 +129,17 @@ export default function EstoquePage() {
         created_by_name: saasUser?.name || null,
       })
 
+      await createHistoryEvent({
+        client_id: null,
+        client_name: null,
+        action_type: "stock_adjusted",
+        action_title: "Estoque ajustado",
+        action_description: `Produto: ${selectedProduct.name} | Ajuste: ${data.type === 'in' ? '+' : data.type === 'out' ? '-' : ''}${data.quantity} | Novo saldo: ${newStock}`,
+        performed_by_user_id: (saasUser as any)?.id || "system",
+        performed_by_name: saasUser?.name || "Sistema",
+        performed_by_email: saasUser?.email || null
+      })
+
       toast.success("Estoque ajustado com sucesso!")
       setShowAdjustmentModal(false)
       loadProducts()
@@ -129,6 +161,16 @@ export default function EstoquePage() {
 
     try {
       await deleteDocument("products", id)
+      await createHistoryEvent({
+        client_id: null,
+        client_name: null,
+        action_type: "product_deleted",
+        action_title: "Produto excluído",
+        action_description: `Produto: ${name}`,
+        performed_by_user_id: (saasUser as any)?.id || "system",
+        performed_by_name: saasUser?.name || "Sistema",
+        performed_by_email: saasUser?.email || null
+      })
       toast.success("Produto excluído com sucesso!")
       loadProducts()
     } catch (err) {
@@ -158,6 +200,17 @@ export default function EstoquePage() {
     for (const id of ids) {
       try {
         await deleteDocument("products", id)
+        const name = allProducts.find(p => p.id === id)?.name || "Produto"
+        await createHistoryEvent({
+          client_id: null,
+          client_name: null,
+          action_type: "product_deleted",
+          action_title: "Produto excluído",
+          action_description: `Produto (Exclusão em massa): ${name}`,
+          performed_by_user_id: (saasUser as any)?.id || "system",
+          performed_by_name: saasUser?.name || "Sistema",
+          performed_by_email: saasUser?.email || null
+        })
         successCount++
       } catch {
         failCount++

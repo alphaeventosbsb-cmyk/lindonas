@@ -132,6 +132,18 @@ export function HistoricoPage() {
           case 'DEBIT_PAID':
             matched = typeStr === 'debit_paid' || titleStr.includes('débito quitado') || titleStr.includes('débito removido')
             break
+          case 'PRODUCT_CREATED':
+            matched = typeStr === 'product_created' || titleStr.includes('produto cadastrado')
+            break
+          case 'PRODUCT_UPDATED':
+            matched = typeStr === 'product_updated' || titleStr.includes('produto atualizado')
+            break
+          case 'PRODUCT_DELETED':
+            matched = typeStr === 'product_deleted' || titleStr.includes('produto excluído')
+            break
+          case 'STOCK_ADJUSTED':
+            matched = typeStr === 'stock_adjusted' || titleStr.includes('estoque ajustado')
+            break
           default:
             matched = typeStr === actionFilter.toLowerCase() || titleStr === actionFilter.toLowerCase()
         }
@@ -173,7 +185,11 @@ export function HistoricoPage() {
     { label: 'Crédito adicionado', value: 'CREDIT_ADD' },
     { label: 'Crédito usado', value: 'CREDIT_USE' },
     { label: 'Débito adicionado', value: 'DEBIT_ADD' },
-    { label: 'Débito quitado', value: 'DEBIT_PAID' }
+    { label: 'Débito quitado', value: 'DEBIT_PAID' },
+    { label: 'Produto cadastrado', value: 'PRODUCT_CREATED' },
+    { label: 'Produto atualizado', value: 'PRODUCT_UPDATED' },
+    { label: 'Produto excluído', value: 'PRODUCT_DELETED' },
+    { label: 'Estoque ajustado', value: 'STOCK_ADJUSTED' }
   ]
 
   const [selectedEvent, setSelectedEvent] = useState<HistoryEvent | null>(null)

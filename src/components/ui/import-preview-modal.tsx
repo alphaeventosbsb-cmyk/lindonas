@@ -90,9 +90,12 @@ export function ImportPreviewModal({ moduleType, onClose, fullData, onConfirm }:
       previewInitial.forEach(row => Object.keys(row).forEach(k => allKeys.add(k)))
       const keysArray = Array.from(allKeys)
       
-      let autoMap = {}
+      let autoMap: Record<string, string> = {}
       if (previewInitial.length > 0) {
-        autoMap = mapImportColumns(previewInitial[0], moduleType)
+        const rawAutoMap = mapImportColumns(previewInitial[0], moduleType)
+        Object.entries(rawAutoMap).forEach(([fieldKey, colName]) => {
+          autoMap[colName as string] = fieldKey
+        })
       }
 
       setRawValidData(valid as Record<string, unknown>[])

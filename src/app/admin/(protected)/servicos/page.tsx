@@ -17,6 +17,7 @@ import { PermissionGate } from "@/components/ui/permission-gate"
 import { ExportButtons } from "@/components/ui/export-buttons"
 import { type ColumnDef, formatCurrencyForExport, formatDurationForExport } from "@/lib/export-utils"
 import { logDataAudit } from "@/lib/firebase/audit-service"
+import { useTenant } from "@/lib/auth/tenant-context"
 
 const inputStyle: React.CSSProperties = {
   width: '100%', padding: '0.75rem 1rem', borderRadius: '0.75rem',

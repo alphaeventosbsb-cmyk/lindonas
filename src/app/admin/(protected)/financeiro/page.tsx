@@ -13,6 +13,8 @@ import {
 import { useConfirm } from "@/components/ui/confirm-modal"
 import { usePermission } from "@/lib/rbac/usePermission"
 import { PermissionGate } from "@/components/ui/permission-gate"
+import { ExportButtons } from "@/components/ui/export-buttons"
+import { formatCurrencyForExport, formatDateForExport, type ColumnDef } from "@/lib/export-utils"
 
 const inputStyle: React.CSSProperties = {
   width: '100%', padding: '0.75rem 1rem', borderRadius: '0.75rem',
@@ -111,6 +113,15 @@ export default function FinanceiroPage() {
     const matchType = typeFilter === "all" || e.type === typeFilter
     return matchSearch && matchType
   })
+
+  const exportColumns: ColumnDef<FinancialEntry>[] = useMemo(() => [
+    { header: "Data", key: "date", format: (v) => formatDateForExport(v) },
+    { header: "Tipo", key: "type", format: (v) => v === "income" ? "Entrada" : "Saída" },
+    { header: "Descrição", key: "description" },
+    { header: "Categoria", key: "category" },
+    { header: "Valor", key: "amount", format: (v) => formatCurrencyForExport(v) },
+    { header: "Pgto", key: "payment_method", format: (v) => paymentLabels[v as string] || v || "—" }
+  ], [])
 
   const totalIncome = monthEntries.filter(e => e.type === "income").reduce((s, e) => s + (e.amount || 0), 0)
   const totalExpense = monthEntries.filter(e => e.type === "expense").reduce((s, e) => s + (e.amount || 0), 0)
@@ -212,6 +223,20 @@ export default function FinanceiroPage() {
             <ArrowDownCircle style={{ width: '1rem', height: '1rem' }} /> Nova Saída
           </button>
         </PermissionGate>
+
+        <PermissionGate permission="finance.export">
+          <div style={{ marginLeft: '0.5rem', display: 'flex' }}>
+            <ExportButtons 
+              data={filtered}
+              columns={exportColumns}
+              fileName={`financeiro_${monthFilter}`}
+              title={`Relatório Financeiro - ${monthFilter}`}
+              exportPermissionKey="finance.export"
+              moduleName="financeiro"
+            />
+          </div>
+        </PermissionGate>
+
         <div style={{ flex: 1 }} />
         <input type="month" value={monthFilter} onChange={e => setMonthFilter(e.target.value)} style={{ ...inputStyle, width: 'auto', cursor: 'pointer' }} />
       </div>

@@ -3,13 +3,16 @@
 import { useEffect, useState, useMemo } from "react"
 import { fetchCollection } from "@/lib/firebase/client-utils"
 import type { Client, Appointment } from "@/lib/types/database"
-import { formatCurrency } from "@/lib/utils"
-import { Loader2, Trophy, ArrowUpRight, ArrowDownRight, Star, Calendar } from "lucide-react"
+import { formatCurrency, toLocalDateStr } from "@/lib/utils"
+import { Loader2, Trophy, ArrowUpRight, ArrowDownRight, Star, Calendar, Search } from "lucide-react"
 import { ExpandableImage } from "@/components/ui/expandable-image"
+import { toast } from "sonner"
 import { ExportButtons } from "@/components/ui/export-buttons"
 
-type Period = "all" | "today" | "week" | "month" | "year"
+type Period = "all" | "today" | "week" | "month" | "year" | "custom"
 type SortBy = "visits" | "revenue" | "ticket"
+
+const inputStyle: React.CSSProperties = { padding: '0.75rem 1rem', borderRadius: '0.75rem', border: '2px solid #e2e8f0', backgroundColor: '#fff', color: '#1e1e2d', fontSize: '0.875rem', fontWeight: 500, outline: 'none' }
 
 export default function RankingClientesPage() {
   const [clients, setClients] = useState<Client[]>([])
@@ -17,6 +20,39 @@ export default function RankingClientesPage() {
   const [loading, setLoading] = useState(true)
   const [period, setPeriod] = useState<Period>("all")
   const [sortBy, setSortBy] = useState<SortBy>("revenue")
+
+  const [inputStart, setInputStart] = useState(() => {
+    const n = new Date(); return toLocalDateStr(new Date(n.getFullYear(), n.getMonth(), 1))
+  })
+  const [inputEnd, setInputEnd] = useState(() => {
+    const n = new Date(); return toLocalDateStr(new Date(n.getFullYear(), n.getMonth() + 1, 0))
+  })
+  const [customStart, setCustomStart] = useState(inputStart)
+  const [customEnd, setCustomEnd] = useState(inputEnd)
+  const [isSearching, setIsSearching] = useState(false)
+  const [searchTerm, setSearchTerm] = useState("")
+
+  const handleSearch = () => {
+    if (inputStart > inputEnd) {
+      toast.error("A data inicial não pode ser maior que a data final.")
+      return
+    }
+    if (!inputStart || !inputEnd) {
+      toast.warning("Por favor, preencha ambas as datas.")
+      return
+    }
+    setIsSearching(true)
+    setTimeout(() => {
+      setCustomStart(inputStart)
+      setCustomEnd(inputEnd)
+      setPeriod("custom")
+      setIsSearching(false)
+    }, 400)
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') handleSearch()
+  }
 
   const load = async () => {
     setLoading(true)
@@ -39,6 +75,11 @@ export default function RankingClientesPage() {
     const filteredAppointments = appointments.filter(apt => {
       if (period === "all") return true
       const aptDate = apt.appointment_date // YYYY-MM-DD
+      
+      if (period === "custom") {
+        return aptDate >= customStart && aptDate <= customEnd
+      }
+
       if (period === "today") return aptDate === todayStr
       
       const aptD = new Date(aptDate)
@@ -76,13 +117,21 @@ export default function RankingClientesPage() {
       }
     })
 
-    const data = clients.map(c => {
+    let data = clients.map(c => {
       const s = stats[c.id]
       const visits = period === "all" ? Math.max(c.appointment_count || 0, s.visits) : s.visits
       const revenue = period === "all" ? Math.max(c.total_spent || 0, s.revenue) : s.revenue
       const ticket = visits > 0 ? revenue / visits : 0
       return { ...c, stats: { visits, revenue, ticket, lastVisit: s.lastVisit } }
     }).filter(c => c.stats.visits > 0 || c.stats.revenue > 0)
+
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase().trim()
+      data = data.filter(c => 
+        c.name.toLowerCase().includes(term) || 
+        (c.phone && c.phone.replace(/\D/g, '').includes(term.replace(/\D/g, '')))
+      )
+    }
 
     data.sort((a, b) => {
       if (sortBy === "revenue") return b.stats.revenue - a.stats.revenue
@@ -91,11 +140,11 @@ export default function RankingClientesPage() {
     })
 
     return data
-  }, [clients, appointments, period, sortBy])
+  }, [clients, appointments, period, sortBy, customStart, customEnd, searchTerm])
 
   const exportConfig = {
-    title: `Ranking de Clientes (${period})`,
-    fileName: `ranking_clientes_${period}`,
+    title: `Ranking de Clientes (${period === "custom" ? `${customStart.split('-').reverse().join('/')} a ${customEnd.split('-').reverse().join('/')}` : period})`,
+    fileName: `ranking_clientes_${period === "custom" ? "personalizado" : period}`,
     data: rankingData.map((c, idx) => ({ ...c, position: idx + 1 })),
     columns: [
       { header: "Posição", key: "position" },
@@ -149,36 +198,78 @@ export default function RankingClientesPage() {
       )}
 
       {/* Controls */}
-      <div style={{ background: '#fff', borderRadius: '1rem', padding: '1rem', border: '1px solid #e5e7eb', display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <Calendar style={{ width: '1.25rem', height: '1.25rem', color: '#64748b' }} />
-            <select value={period} onChange={e => setPeriod(e.target.value as Period)}
-              style={{ padding: '0.625rem 1rem', borderRadius: '0.75rem', border: '2px solid #e2e8f0', backgroundColor: '#fff', fontSize: '0.875rem', fontWeight: 600, outline: 'none', cursor: 'pointer' }}>
-              <option value="all">Todo o Período</option>
-              <option value="today">Hoje</option>
-              <option value="week">Esta Semana</option>
-              <option value="month">Este Mês</option>
-              <option value="year">Este Ano</option>
-            </select>
+      <div style={{ background: '#fff', borderRadius: '1rem', padding: '1.25rem', border: '1px solid #e5e7eb', display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-end', justifyContent: 'space-between', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+        
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <div>
+            <label style={{ display: 'block', fontSize: '0.6875rem', fontWeight: 700, color: '#8b8fa7', marginBottom: '0.375rem', textTransform: 'uppercase' }}>Filtro Rápido</label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Calendar style={{ width: '1.25rem', height: '1.25rem', color: '#64748b' }} />
+              <select value={period} onChange={e => setPeriod(e.target.value as Period)}
+                style={inputStyle}>
+                <option value="all">Todo o Período</option>
+                <option value="today">Hoje</option>
+                <option value="week">Esta Semana</option>
+                <option value="month">Este Mês</option>
+                <option value="year">Este Ano</option>
+                {period === "custom" && <option value="custom">Personalizado</option>}
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label style={{ display: 'block', fontSize: '0.6875rem', fontWeight: 700, color: '#8b8fa7', marginBottom: '0.375rem', textTransform: 'uppercase' }}>Período De</label>
+            <input type="date" value={inputStart} onChange={e => setInputStart(e.target.value)} onKeyDown={handleKeyDown} style={inputStyle} />
+          </div>
+          <div>
+            <label style={{ display: 'block', fontSize: '0.6875rem', fontWeight: 700, color: '#8b8fa7', marginBottom: '0.375rem', textTransform: 'uppercase' }}>Até</label>
+            <input type="date" value={inputEnd} onChange={e => setInputEnd(e.target.value)} onKeyDown={handleKeyDown} style={inputStyle} />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+            <button 
+              onClick={handleSearch} 
+              disabled={isSearching} 
+              title="Pesquisar período"
+              style={{ 
+                height: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', 
+                padding: '0 1rem', borderRadius: '0.75rem', border: 'none', background: '#7c5cfc', color: '#fff', 
+                fontWeight: 700, cursor: isSearching ? 'not-allowed' : 'pointer', transition: 'all 0.2s',
+                boxShadow: '0 1px 3px rgba(124,92,252,0.2)'
+              }}
+            >
+              {isSearching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+            </button>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', position: 'relative', marginLeft: '0.5rem' }}>
+            <Search style={{ width: '1rem', height: '1rem', color: '#94a3b8', position: 'absolute', left: '0.75rem', bottom: '0.875rem' }} />
+            <input 
+              type="text" 
+              placeholder="Buscar cliente..." 
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              style={{ ...inputStyle, paddingLeft: '2.25rem', width: '220px' }}
+            />
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-          <ExportButtons 
-            data={exportConfig.data}
-            columns={exportConfig.columns}
-            fileName={exportConfig.fileName}
-            title={exportConfig.title}
-          />
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#64748b' }}>Ordenar por:</span>
-            <select value={sortBy} onChange={e => setSortBy(e.target.value as SortBy)}
-              style={{ padding: '0.625rem 1rem', borderRadius: '0.75rem', border: '2px solid #e2e8f0', backgroundColor: '#fff', fontSize: '0.875rem', fontWeight: 600, outline: 'none', cursor: 'pointer' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+             <label style={{ display: 'block', fontSize: '0.6875rem', fontWeight: 700, color: '#8b8fa7', marginBottom: '0.375rem', textTransform: 'uppercase' }}>Ordenar por</label>
+             <select value={sortBy} onChange={e => setSortBy(e.target.value as SortBy)}
+              style={inputStyle}>
               <option value="revenue">Maior Faturamento</option>
               <option value="visits">Mais Visitas</option>
               <option value="ticket">Maior Ticket Médio</option>
             </select>
+          </div>
+          <div style={{ display: 'flex', gap: '0.5rem', height: '42px' }}>
+            <ExportButtons 
+              data={exportConfig.data}
+              columns={exportConfig.columns}
+              fileName={exportConfig.fileName}
+              title={exportConfig.title}
+            />
           </div>
         </div>
       </div>

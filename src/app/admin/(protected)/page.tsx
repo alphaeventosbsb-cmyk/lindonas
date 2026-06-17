@@ -87,15 +87,22 @@ export default function AdminDashboardPage() {
     confirmed: "Confirmado", pending: "Pendente", completed: "Concluído", cancelled: "Cancelado", in_progress: "Em andamento",
   }
 
-  // Revenue chart - last 7 days
-  const last7Days = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(); d.setDate(d.getDate() - (6 - i)); return toLocalDateStr(d)
+  // Staff Presence
+  const staffMembers = employees.filter(e => e.access_enabled || e.email || e.google_email)
+  const staffWithPresence = staffMembers.map(e => {
+    const isOnline = e.is_online || (e.last_seen && new Date().getTime() - new Date(e.last_seen).getTime() < 5 * 60 * 1000)
+    return { ...e, computed_online: isOnline }
   })
-  const dailyRevenue = last7Days.map(day => {
-    const dayApts = completedApts.filter(a => a.appointment_date === day)
-    return { day, revenue: dayApts.reduce((s, a) => s + (a.service_price || 0), 0) }
+  staffWithPresence.sort((a, b) => {
+    if (a.computed_online && !b.computed_online) return -1
+    if (!a.computed_online && b.computed_online) return 1
+    if (a.last_seen && b.last_seen) return new Date(b.last_seen).getTime() - new Date(a.last_seen).getTime()
+    if (a.last_seen && !b.last_seen) return -1
+    if (!a.last_seen && b.last_seen) return 1
+    return a.name.localeCompare(b.name)
   })
-  const maxRevenue = Math.max(...dailyRevenue.map(d => d.revenue), 1)
+  const onlineCount = staffWithPresence.filter(s => s.computed_online).length
+  const offlineCount = staffWithPresence.length - onlineCount
 
   // ── Shared Styles ──
   const card: React.CSSProperties = { background: '#fff', borderRadius: '1rem', border: '1px solid #e8ecf4', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }
@@ -154,29 +161,55 @@ export default function AdminDashboardPage() {
 
       {/* ── Chart + Debtors row ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
-        {/* Revenue Chart */}
+        {/* Status da Equipe */}
         <div style={card}>
-          <div style={{ ...sectionHeader, padding: '1.25rem 1.5rem' }}>
-            <div style={{ ...iconBox('#ecfdf5'), width: '2.5rem', height: '2.5rem' }}><TrendingUp style={{ width: '20px', height: '20px', color: '#22c997' }} /></div>
-            <div>
-              <h3 style={{ fontFamily: 'var(--font-heading)', fontSize: '1.125rem', fontWeight: 700, color: '#1e1e2d' }}>Receita - Últimos 7 dias</h3>
-              <p style={{ fontSize: '0.875rem', color: '#8b8fa7' }}>Receita diária de serviços concluídos</p>
+          <div style={{ ...sectionHeader, padding: '1.25rem 1.5rem', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              <div style={{ ...iconBox('#ecfdf5'), width: '2.5rem', height: '2.5rem' }}><UserCheck style={{ width: '20px', height: '20px', color: '#22c997' }} /></div>
+              <div>
+                <h3 style={{ fontFamily: 'var(--font-heading)', fontSize: '1.125rem', fontWeight: 700, color: '#1e1e2d' }}>Status da Equipe</h3>
+                <p style={{ fontSize: '0.875rem', color: '#8b8fa7' }}>
+                  <span style={{ color: '#22c997', fontWeight: 600 }}>{onlineCount} Online</span> • {offlineCount} Offline
+                </p>
+              </div>
             </div>
           </div>
-          <div style={{ padding: '1.5rem' }}>
-            <div style={{ display: 'flex', alignItems: 'flex-end', gap: '0.5rem', height: '14rem' }}>
-              {dailyRevenue.map((d, i) => {
-                const height = maxRevenue > 0 ? (d.revenue / maxRevenue) * 100 : 0
-                const dayLabel = new Date(d.day + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'short' })
-                return (
-                  <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem', height: '100%', justifyContent: 'flex-end' }}>
-                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#7c5cfc' }}>{d.revenue > 0 ? formatCurrency(d.revenue) : ''}</span>
-                    <div style={{ width: '100%', maxWidth: '3rem', borderRadius: '6px 6px 0 0', background: d.day === today ? 'linear-gradient(180deg, #7c5cfc, #a78bfa)' : 'linear-gradient(180deg, #e0d4ff, #f0ecff)', height: `${Math.max(height, 4)}%`, transition: 'height 0.5s ease', boxShadow: d.day === today ? '0 4px 12px rgba(124,92,252,0.3)' : 'none' }} />
-                    <span style={{ fontSize: '0.75rem', fontWeight: 600, color: d.day === today ? '#7c5cfc' : '#9ca3af', textTransform: 'capitalize' }}>{dayLabel.replace('.', '')}</span>
+          <div style={{ maxHeight: '15.5rem', overflowY: 'auto' }}>
+            {staffWithPresence.length > 0 ? staffWithPresence.map(staff => {
+              const presenceText = staff.computed_online ? "Online" : (staff.last_seen ? (() => {
+                const diffMs = new Date().getTime() - new Date(staff.last_seen).getTime()
+                const diffMins = Math.floor(diffMs / (60 * 1000))
+                if (diffMins < 60) return `há ${diffMins} minutos`
+                const diffHours = Math.floor(diffMins / 60)
+                if (diffHours < 24) return `há ${diffHours} horas`
+                const diffDays = Math.floor(diffHours / 24)
+                return `há ${diffDays} dias`
+              })() : "Nunca acessou")
+
+              return (
+                <div key={staff.id} style={{ padding: '0.875rem 1.5rem', display: 'flex', alignItems: 'center', gap: '1rem', borderBottom: '1px solid #f5f5fa' }}>
+                  <div style={{ width: '2.5rem', height: '2.5rem', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc', color: '#64748b', fontSize: '0.875rem', fontWeight: 700, flexShrink: 0, position: 'relative' }}>
+                    {staff.name.charAt(0)}
+                    <div style={{ position: 'absolute', bottom: '0', right: '0', width: '10px', height: '10px', borderRadius: '50%', background: staff.computed_online ? '#22c997' : '#cbd5e1', border: '2px solid #fff' }} />
                   </div>
-                )
-              })}
-            </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontSize: '0.9375rem', fontWeight: 600, color: '#1e1e2d', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{staff.name}</p>
+                    <p style={{ fontSize: '0.8125rem', color: '#8b8fa7', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{staff.email || staff.google_email || "Sem e-mail"}</p>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
+                    {staff.computed_online ? (
+                      <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#22c997', background: '#ecfdf5', padding: '0.25rem 0.625rem', borderRadius: '99px' }}>Online</span>
+                    ) : (
+                      <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8' }}>{presenceText}</span>
+                    )}
+                  </div>
+                </div>
+              )
+            }) : (
+              <div style={{ padding: '3.5rem 1.5rem', textAlign: 'center' }}>
+                <p style={{ fontSize: '0.875rem', color: '#8b8fa7' }}>Nenhum membro da equipe encontrado</p>
+              </div>
+            )}
           </div>
         </div>
 

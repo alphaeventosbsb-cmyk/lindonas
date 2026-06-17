@@ -284,6 +284,8 @@ export interface Employee {
   rbac_updated_at?: string | null
   rbac_updated_by?: string | null
   is_active: boolean
+  is_online?: boolean
+  last_seen?: string | null
   created_at: string
   updated_at: string
 }

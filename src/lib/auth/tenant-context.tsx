@@ -371,6 +371,52 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     }
   }, [saasUser, user?.email])
 
+  useEffect(() => {
+    // Heartbeat logic to keep the user "online"
+    const professionalId = (saasUser as SaaSUserWithProfessional | null)?.professional_id
+    if (!saasUser || isSuperAdmin(user?.email)) return
+
+    const updatePresence = async (online: boolean) => {
+      try {
+        const payload = {
+          is_online: online,
+          last_seen: new Date().toISOString()
+        }
+        // Update SaaS User
+        if (saasUser.id && !saasUser.id.startsWith("__")) {
+          await updateDocument("saas_users", saasUser.id, payload)
+        }
+        // Update Employee if linked
+        if (professionalId && !professionalId.startsWith("__")) {
+          await updateDocument("employees", professionalId, payload)
+        }
+      } catch (e) {
+        console.warn("Could not update presence:", e)
+      }
+    }
+
+    // Set online immediately
+    updatePresence(true)
+    
+    // Heartbeat every 2 minutes
+    const intervalId = setInterval(() => {
+      updatePresence(true)
+    }, 2 * 60 * 1000)
+
+    // Handle window close
+    const handleBeforeUnload = () => {
+      updatePresence(false)
+    }
+    window.addEventListener("beforeunload", handleBeforeUnload)
+
+    return () => {
+      clearInterval(intervalId)
+      window.removeEventListener("beforeunload", handleBeforeUnload)
+      // When component unmounts (e.g. logout), set offline
+      updatePresence(false)
+    }
+  }, [saasUser, user?.email])
+
   const isSuperAdminUser = isSuperAdmin(user?.email)
   const companyId = saasUser?.company_id && saasUser.company_id !== "__master__" ? saasUser.company_id : null
   const role = isSuperAdminUser ? "master_admin" : (saasUser?.role || null)

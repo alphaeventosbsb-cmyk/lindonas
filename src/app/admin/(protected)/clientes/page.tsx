@@ -5,7 +5,7 @@ import { fetchCollection, createDocument, updateDocument, deleteDocument } from 
 import { uploadToCloudinary } from "@/lib/cloudinary"
 import type { Client, Appointment } from "@/lib/types/database"
 import { formatCurrency, formatPhone, formatCPF } from "@/lib/utils"
-import { Loader2, Plus, Pencil, Trash2, Search, UserCheck, AlertTriangle, Phone, Mail, DollarSign, Star, MapPin, LayoutGrid, List } from "lucide-react"
+import { Loader2, Plus, Pencil, Trash2, Search, UserCheck, AlertTriangle, Phone, Mail, DollarSign, Star, MapPin, LayoutGrid, List, CheckSquare } from "lucide-react"
 import { ExpandableImage } from "@/components/ui/expandable-image"
 import { toast } from "sonner"
 import { useTenant } from "@/lib/auth/tenant-context"
@@ -37,6 +37,8 @@ export default function ClientesPage() {
   const canViewCPF = can("security.cpf.view")
   const [viewMode, setViewMode] = useState<"list" | "cards">("list")
   const { ConfirmationDialog, confirm } = useConfirm()
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [selectionMode, setSelectionMode] = useState(false)
 
   const load = async () => {
     setLoading(true)
@@ -117,6 +119,41 @@ export default function ClientesPage() {
       toast.success("Cliente excluído")
       load()
     } catch { toast.error("Erro ao excluir cliente") }
+  }
+
+  const handleBulkDelete = async () => {
+    if (!canEdit) { toast.error('Sem permissão'); return }
+    const ids = Array.from(selectedIds)
+    const names = ids.map(id => clients.find(c => c.id === id)?.name || "Cliente")
+    const listText = names.length <= 5
+      ? names.map(n => `• ${n}`).join('\n')
+      : names.slice(0, 5).map(n => `• ${n}`).join('\n') + `\n...e mais ${names.length - 5} cliente(s)`
+
+    const confirmed = await confirm({
+      title: "Excluir clientes selecionados",
+      message: `Tem certeza que deseja excluir ${ids.length} clientes selecionados?\n\n${listText}\n\nEssa ação pode afetar histórico, créditos, débitos e agendamentos vinculados.\n\nEssa ação não poderá ser desfeita.`,
+      confirmText: "Excluir clientes",
+      cancelText: "Cancelar",
+      variant: "danger",
+    })
+    if (!confirmed) return
+
+    let successCount = 0
+    let failCount = 0
+    for (const id of ids) {
+      try {
+        await deleteDocument("clients", id)
+        successCount++
+      } catch {
+        failCount++
+      }
+    }
+    
+    setSelectedIds(new Set())
+    setSelectionMode(false)
+    if (successCount > 0) toast.success(`${successCount} cliente(s) excluído(s) com sucesso`)
+    if (failCount > 0) toast.error(`${failCount} cliente(s) não puderam ser excluídos`)
+    load()
   }
 
   const handleImportConfirm = async (importedClients: Record<string, unknown>[], mappedKeys: string[], columnMapping: Record<string, string>) => {
@@ -228,6 +265,10 @@ export default function ClientesPage() {
     return true
   })
 
+  useEffect(() => {
+    setSelectedIds(new Set())
+  }, [search, statusFilter])
+
   const totalDebt = clients.reduce((sum, c) => sum + (c.debt_amount || 0), 0)
   const debtors = clients.filter(c => c.status === "debtor").length
   const vips = clients.filter(c => c.is_vip).length
@@ -300,21 +341,40 @@ export default function ClientesPage() {
           <option value="inactive">Inativos</option>
           <option value="vip">VIP ⭐</option>
         </select>
-        <PermissionGate permission="clients.create">
-          <button onClick={openNew}
-            style={{ padding: '0.625rem 1.25rem', borderRadius: '0.75rem', color: '#fff', fontWeight: 700, fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: '0.5rem', border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg, #7c5cfc, #a78bfa)', boxShadow: '0 4px 14px rgba(124,92,252,0.3)', whiteSpace: 'nowrap' }}>
-            <Plus style={{ width: '1rem', height: '1rem' }} /> Novo Cliente
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <button
+            onClick={() => {
+              if (selectionMode) { setSelectedIds(new Set()); setSelectionMode(false) }
+              else setSelectionMode(true)
+            }}
+            style={{
+              padding: '0.625rem 1rem', borderRadius: '0.75rem', fontWeight: 600, fontSize: '0.8125rem',
+              display: 'flex', alignItems: 'center', gap: '0.375rem', cursor: 'pointer',
+              border: selectionMode ? '2px solid #ef4444' : '2px solid #e8ecf4',
+              background: selectionMode ? '#fef2f2' : '#fff',
+              color: selectionMode ? '#ef4444' : '#4b5563',
+              transition: 'all 0.15s',
+            }}
+          >
+            <CheckSquare style={{ width: '15px', height: '15px' }} />
+            {selectionMode ? 'Cancelar' : 'Selecionar'}
           </button>
-        </PermissionGate>
-        <ExportButtons
-          data={filtered}
-          columns={exportColumns}
-          fileName={`clientes-${new Date().toISOString().split('T')[0]}`}
-          title="Relatório de Clientes"
-          importModule="clientes"
-          fullData={clients}
-          onImportConfirm={handleImportConfirm}
-        />
+          <PermissionGate permission="clients.create">
+            <button onClick={openNew}
+              style={{ padding: '0.625rem 1.25rem', borderRadius: '0.75rem', color: '#fff', fontWeight: 700, fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: '0.5rem', border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg, #7c5cfc, #a78bfa)', boxShadow: '0 4px 14px rgba(124,92,252,0.3)', whiteSpace: 'nowrap' }}>
+              <Plus style={{ width: '1rem', height: '1rem' }} /> Novo Cliente
+            </button>
+          </PermissionGate>
+          <ExportButtons
+            data={filtered}
+            columns={exportColumns}
+            fileName={`clientes-${new Date().toISOString().split('T')[0]}`}
+            title="Relatório de Clientes"
+            importModule="clientes"
+            fullData={clients}
+            onImportConfirm={handleImportConfirm}
+          />
+        </div>
         <div style={{ display: 'flex', gap: '0.375rem', background: '#f8fafc', padding: '0.25rem', borderRadius: '0.5rem', border: '1px solid #e2e8f0', marginLeft: 'auto' }}>
           <button 
             onClick={() => setViewMode("cards")}
@@ -343,12 +403,65 @@ export default function ClientesPage() {
         </div>
       </div>
 
+      {/* Bulk action bar */}
+      {selectedIds.size > 0 && (
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem',
+          background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '0.75rem',
+          padding: '0.625rem 1rem', marginBottom: '1rem'
+        }}>
+          <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#991b1b' }}>
+            {selectedIds.size} cliente{selectedIds.size > 1 ? 's' : ''} selecionado{selectedIds.size > 1 ? 's' : ''}
+          </span>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button
+              onClick={() => { setSelectedIds(new Set()); setSelectionMode(false) }}
+              style={{
+                padding: '0.375rem 0.75rem', borderRadius: '0.5rem', border: '1px solid #e8ecf4',
+                background: '#fff', color: '#4b5563', fontSize: '0.75rem', fontWeight: 600,
+                cursor: 'pointer', transition: 'all 0.15s',
+              }}
+            >
+              Limpar seleção
+            </button>
+            <PermissionGate permission="clients.delete">
+              <button
+                onClick={handleBulkDelete}
+                style={{
+                  padding: '0.375rem 0.75rem', borderRadius: '0.5rem', border: 'none',
+                  background: '#ef4444', color: '#fff', fontSize: '0.75rem', fontWeight: 700,
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.375rem',
+                  transition: 'all 0.15s', boxShadow: '0 2px 8px rgba(239,68,68,0.25)',
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = '#dc2626'}
+                onMouseLeave={e => e.currentTarget.style.background = '#ef4444'}
+              >
+                <Trash2 style={{ width: '14px', height: '14px' }} /> Excluir Selecionados
+              </button>
+            </PermissionGate>
+          </div>
+        </div>
+      )}
+
       {/* Client List */}
       {viewMode === "list" ? (
         <div style={{ background: '#fff', borderRadius: '1rem', border: '1px solid #e8ecf4', overflowX: 'auto', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
           <div style={{ minWidth: '900px' }}>
             {/* Header */}
             <div style={{ display: 'flex', padding: '0.625rem 1.25rem', gap: '0.75rem', alignItems: 'center', background: '#fafbfc', borderBottom: '1px solid #f1f3f9' }}>
+              {selectionMode && (
+                <div style={{ width: '2rem', display: 'flex', justifyContent: 'center' }}>
+                  <input
+                    type="checkbox"
+                    checked={filtered.length > 0 && selectedIds.size === filtered.length}
+                    onChange={(e) => {
+                      if (e.target.checked) setSelectedIds(new Set(filtered.map(c => c.id)))
+                      else setSelectedIds(new Set())
+                    }}
+                    style={{ width: '1.125rem', height: '1.125rem', cursor: 'pointer', accentColor: '#7c5cfc' }}
+                  />
+                </div>
+              )}
               <span style={{ width: '2.75rem', flexShrink: 0 }} /> {/* Avatar Spacer */}
               <span style={{ flex: 2, fontSize: '0.5625rem', fontWeight: 700, color: '#8b8fa7', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Cliente</span>
               <span style={{ flex: 1.5, fontSize: '0.5625rem', fontWeight: 700, color: '#8b8fa7', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Contato / Local</span>
@@ -371,11 +484,26 @@ export default function ClientesPage() {
                   style={{
                     display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.625rem 1.25rem',
                     borderBottom: '1px solid #f5f5fa', transition: 'all 0.15s',
-                    background: client.status === "debtor" ? '#fffafa' : '#fff'
+                    background: selectedIds.has(client.id) ? '#f5f3ff' : client.status === "debtor" ? '#fffafa' : '#fff'
                   }}
-                  onMouseEnter={e => { e.currentTarget.style.background = client.status === "debtor" ? '#fef2f2' : '#faf8ff'; e.currentTarget.style.transform = 'translateX(2px)' }}
-                  onMouseLeave={e => { e.currentTarget.style.background = client.status === "debtor" ? '#fffafa' : '#fff'; e.currentTarget.style.transform = 'none' }}
+                  onMouseEnter={e => { e.currentTarget.style.background = selectedIds.has(client.id) ? '#ede9fe' : client.status === "debtor" ? '#fef2f2' : '#faf8ff'; e.currentTarget.style.transform = 'translateX(2px)' }}
+                  onMouseLeave={e => { e.currentTarget.style.background = selectedIds.has(client.id) ? '#f5f3ff' : client.status === "debtor" ? '#fffafa' : '#fff'; e.currentTarget.style.transform = 'none' }}
                 >
+                  {selectionMode && (
+                    <div style={{ width: '2rem', display: 'flex', justifyContent: 'center', flexShrink: 0 }}>
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(client.id)}
+                        onChange={(e) => {
+                          const newSet = new Set(selectedIds)
+                          if (e.target.checked) newSet.add(client.id)
+                          else newSet.delete(client.id)
+                          setSelectedIds(newSet)
+                        }}
+                        style={{ width: '1.125rem', height: '1.125rem', cursor: 'pointer', accentColor: '#7c5cfc' }}
+                      />
+                    </div>
+                  )}
                   {/* Avatar */}
                   {client.photo_url ? (
                     <ExpandableImage src={client.photo_url} alt={client.name} style={{
@@ -503,7 +631,7 @@ export default function ClientesPage() {
             return (
               <div key={client.id}
                 style={{
-                  background: '#fff', borderRadius: '1rem', border: '1px solid #e8ecf4', overflow: 'hidden',
+                  background: selectedIds.has(client.id) ? '#f5f3ff' : '#fff', borderRadius: '1rem', border: selectedIds.has(client.id) ? '2px solid #7c5cfc' : '1px solid #e8ecf4', overflow: 'hidden',
                   boxShadow: '0 1px 3px rgba(0,0,0,0.04)', transition: 'all 0.15s',
                   position: 'relative'
                 }}
@@ -511,6 +639,23 @@ export default function ClientesPage() {
                 onMouseLeave={ev => { ev.currentTarget.style.transform = 'none'; ev.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.04)' }}
               >
                 <div style={{ height: '4px', background: client.status === "debtor" ? 'linear-gradient(135deg, #f25c5c, #f78888)' : 'linear-gradient(135deg, #7c5cfc, #a78bfa)' }} />
+                
+                {selectionMode && (
+                  <div style={{ position: 'absolute', top: '1rem', right: '1rem', zIndex: 10 }}>
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(client.id)}
+                      onChange={(e) => {
+                        const newSet = new Set(selectedIds)
+                        if (e.target.checked) newSet.add(client.id)
+                        else newSet.delete(client.id)
+                        setSelectedIds(newSet)
+                      }}
+                      style={{ width: '1.25rem', height: '1.25rem', cursor: 'pointer', accentColor: '#7c5cfc' }}
+                    />
+                  </div>
+                )}
+                
                 <div style={{ padding: '1.25rem' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
                     {client.photo_url ? (

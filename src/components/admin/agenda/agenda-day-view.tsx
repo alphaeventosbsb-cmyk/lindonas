@@ -550,7 +550,7 @@ function ProfessionalHeader({ employee, count, index, columnWidth, expandedColWi
       }}
       onMouseEnter={e => { e.currentTarget.style.background = hoverBg }}
       onMouseLeave={e => { e.currentTarget.style.background = color ? `${color}08` : 'transparent' }}
-      title={`Editar cadastro de ${employee.name}`}
+      title={employee.name}
     >
       {color && <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '3px', background: color }} />}
       {/* Avatar */}
@@ -582,7 +582,7 @@ function ProfessionalHeader({ employee, count, index, columnWidth, expandedColWi
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
           lineHeight: '1.2'
         }}>
-          {employee.name}
+          {employee.nickname || employee.name}
         </p>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
           {employee.specialty && (

@@ -235,32 +235,11 @@ export default function ClientesPage() {
   if (loading) return <div className="flex justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-[#7c5cfc]" /></div>
 
   const exportColumns: ColumnDef<Client>[] = [
-    { header: "Nome", key: "name" },
-    { header: "Apelido", key: "nickname", format: (v) => v || "—" },
-    { header: "Telefone", key: "phone", format: (v) => v ? formatPhone(v as string) : "—" },
-    { header: "Email", key: "email", format: (v) => v || "—" },
-    { header: "CPF", key: "cpf", format: (v) => v ? formatCPF(v as string) : "—" },
-    { header: "RG", key: "rg", format: (v) => v || "—" },
-    { header: "Nascimento", key: "birth_date", format: formatDateForExport },
-    { header: "Gênero", key: "gender", format: (v) => {
-        if (v === 'masculino') return 'Masculino';
-        if (v === 'feminino') return 'Feminino';
-        if (v === 'outro') return 'Outro';
-        return "—";
-      }
-    },
-    { header: "Endereço", key: "id", format: (_, r) => r.address?.street || "—" },
-    { header: "Número", key: "id", format: (_, r) => r.address?.number || "—" },
-    { header: "Complemento", key: "id", format: (_, r) => r.address?.complement || "—" },
-    { header: "Bairro", key: "id", format: (_, r) => r.address?.neighborhood || "—" },
-    { header: "Cidade", key: "id", format: (_, r) => r.address?.city || "—" },
-    { header: "Estado", key: "id", format: (_, r) => r.address?.state || "—" },
-    { header: "CEP", key: "id", format: (_, r) => r.address?.cep || "—" },
-    { header: "Instagram", key: "instagram", format: (v) => v || "—" },
+    { header: "Cliente", key: "name" },
     { header: "Status", key: "status", format: (v) => v === "debtor" ? "Devedor" : v === "active" ? "Ativo" : "Inativo" },
     { header: "VIP", key: "is_vip", format: (v) => v ? "Sim" : "Não" },
-    { header: "Crédito", key: "credit_amount", format: (v) => typeof v === 'number' && v > 0 ? `+${formatCurrency(v)}` : "—" },
-    { header: "Débito", key: "debt_amount", format: (v) => typeof v === 'number' && v > 0 ? `-${formatCurrency(v)}` : "—" },
+    { header: "Crédito", key: "credit_amount", format: (v) => typeof v === 'number' && v > 0 ? formatCurrency(v) : "—" },
+    { header: "Débito", key: "debt_amount", format: (v) => typeof v === 'number' && v > 0 ? formatCurrency(v) : "—" },
     { header: "Total Gasto", key: "id", format: (_, row) => {
         const clientApts = getClientAppointments(row.name);
         const completedApts = clientApts.filter(a => a.status === "completed" || a.status === "closed");
@@ -279,47 +258,7 @@ export default function ClientesPage() {
         return sortedApts.length > 0 ? sortedApts[0].appointment_date.split('-').reverse().join('/') : '—';
       }
     },
-    { header: "Ticket Médio", key: "id", format: (_, row) => {
-        const clientApts = getClientAppointments(row.name);
-        const completedApts = clientApts.filter(a => a.status === "completed" || a.status === "closed");
-        const totalSpent = completedApts.reduce((s, a) => s + (a.service_price || 0), 0);
-        return completedApts.length > 0 ? formatCurrency(totalSpent / completedApts.length) : "—";
-      }
-    },
-    { header: "Origem", key: "referral_source", format: (v) => v ? String(v).replace(/_/g, ' ').toUpperCase() : "—" },
-    { header: "Prof. Mais Atendido", key: "id", format: (_, row) => {
-        const clientApts = getClientAppointments(row.name);
-        const completedApts = clientApts.filter(a => a.status === "completed" || a.status === "closed");
-        if (completedApts.length === 0) return "—";
-        const counts = completedApts.reduce((acc, curr) => {
-          const prof = curr.employee_name || "Desconhecido";
-          acc[prof] = (acc[prof] || 0) + 1;
-          return acc;
-        }, {} as Record<string, number>);
-        let maxProf = "—";
-        let maxCount = 0;
-        for (const [prof, count] of Object.entries(counts)) {
-          if (count > maxCount) { maxCount = count; maxProf = prof; }
-        }
-        return maxProf;
-      }
-    },
-    { header: "Último Serviço", key: "id", format: (_, row) => {
-        const clientApts = getClientAppointments(row.name);
-        const completedApts = clientApts.filter(a => a.status === "completed" || a.status === "closed");
-        const sortedApts = [...completedApts].sort((a,b) => new Date(b.appointment_date).getTime() - new Date(a.appointment_date).getTime());
-        return sortedApts.length > 0 && sortedApts[0].service_name ? sortedApts[0].service_name : "—";
-      }
-    },
-    { header: "Bloq. Online", key: "online_booking_blocked", format: (v) => v ? "Sim" : "Não" },
-    { header: "Ausências", key: "id", format: (_, row) => {
-        const clientApts = getClientAppointments(row.name);
-        const absences = clientApts.filter(a => a.status === "no_show").length;
-        return absences > 0 ? String(absences) : "—";
-      }
-    },
-    { header: "Cliente Desde", key: "created_at", format: formatDateForExport },
-    { header: "Observações", key: "notes", format: (v) => v || "—" },
+    { header: "Cliente Desde", key: "created_at", format: formatDateForExport }
   ]
 
   return (

@@ -117,10 +117,12 @@ export async function exportToPDF<T>(
       body: rows,
       startY: 90,
       theme: 'grid',
-      styles: { fontSize: 8, cellPadding: 4 },
+      styles: { fontSize: 6, cellPadding: 3, overflow: 'linebreak' },
       headStyles: { fillColor: [124, 92, 252], textColor: 255, fontStyle: 'bold' },
       alternateRowStyles: { fillColor: [249, 250, 251] },
-      margin: { top: 40, left: 40, right: 40, bottom: 40 }
+      margin: { top: 40, left: 40, right: 40, bottom: 40 },
+      horizontalPageBreak: true,
+      horizontalPageBreakRepeat: 0,
     })
 
     doc.save(`${fileName}.pdf`)

@@ -188,21 +188,21 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       let currentUser = users[0] || null
       let linkedEmployee: Employee | null = null
 
-      if (!superAdmin) {
-        const professionalId = (currentUser as SaaSUserWithProfessional | null)?.professional_id
-        if (professionalId) {
-          linkedEmployee = await getDocument<Employee>("employees", professionalId)
-        }
+      const professionalId = (currentUser as SaaSUserWithProfessional | null)?.professional_id
+      if (professionalId) {
+        linkedEmployee = await getDocument<Employee>("employees", professionalId)
+      }
 
-        if (!linkedEmployee) {
-          linkedEmployee = await findLinkedEmployee(firebaseUser)
-        }
+      if (!linkedEmployee) {
+        linkedEmployee = await findLinkedEmployee(firebaseUser)
+      }
 
-        if (linkedEmployee) {
+      if (linkedEmployee) {
+        if (!superAdmin) {
           currentUser = await upsertProfessionalSaasUser(firebaseUser, linkedEmployee, currentUser)
           users = [currentUser]
-          setEmployee(linkedEmployee)
         }
+        setEmployee(linkedEmployee)
       }
 
       if (superAdmin) {
@@ -373,8 +373,9 @@ export function TenantProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     // Heartbeat logic to keep the user "online"
-    const professionalId = (saasUser as SaaSUserWithProfessional | null)?.professional_id
-    if (!saasUser || isSuperAdmin(user?.email)) return
+    if (!user) return
+
+    const empIdToUpdate = employee?.id || (saasUser as SaaSUserWithProfessional | null)?.professional_id
 
     const updatePresence = async (online: boolean) => {
       try {
@@ -383,12 +384,12 @@ export function TenantProvider({ children }: { children: ReactNode }) {
           last_seen: new Date().toISOString()
         }
         // Update SaaS User
-        if (saasUser.id && !saasUser.id.startsWith("__")) {
+        if (saasUser?.id && !saasUser.id.startsWith("__")) {
           await updateDocument("saas_users", saasUser.id, payload)
         }
         // Update Employee if linked
-        if (professionalId && !professionalId.startsWith("__")) {
-          await updateDocument("employees", professionalId, payload)
+        if (empIdToUpdate && !empIdToUpdate.startsWith("__")) {
+          await updateDocument("employees", empIdToUpdate, payload)
         }
       } catch (e) {
         console.warn("Could not update presence:", e)
@@ -415,7 +416,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       // When component unmounts (e.g. logout), set offline
       updatePresence(false)
     }
-  }, [saasUser, user?.email])
+  }, [saasUser, user, employee])
 
   const isSuperAdminUser = isSuperAdmin(user?.email)
   const companyId = saasUser?.company_id && saasUser.company_id !== "__master__" ? saasUser.company_id : null

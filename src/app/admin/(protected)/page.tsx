@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { fetchCollection } from "@/lib/firebase/client-utils"
+import { fetchCollection, subscribeCollection } from "@/lib/firebase/client-utils"
 import type { Appointment, Service, Employee, Client, FinancialEntry } from "@/lib/types/database"
 import { CalendarDays, Users, Scissors, DollarSign, TrendingUp, Clock, Loader2, Calendar, Link2, Copy, Check, ExternalLink, UserCheck, AlertTriangle, CreditCard } from "lucide-react"
 import { formatCurrency, toLocalDateStr } from "@/lib/utils"
@@ -32,6 +32,12 @@ export default function AdminDashboardPage() {
       setLoading(false)
     }
     load()
+
+    const unsub = subscribeCollection<Employee>("employees", (emp) => {
+      setEmployees(emp)
+    })
+
+    return () => unsub()
   }, [])
 
   if (loading) {
@@ -60,11 +66,28 @@ export default function AdminDashboardPage() {
   const debtors = clients.filter(c => (c.debt_amount || 0) > 0)
   const totalDebt = debtors.reduce((s, c) => s + (c.debt_amount || 0), 0)
 
+  // Staff Presence
+  const staffMembers = employees.filter(e => e.is_active !== false)
+  const staffWithPresence = staffMembers.map(e => {
+    const isOnline = e.is_online || (e.last_seen && new Date().getTime() - new Date(e.last_seen).getTime() < 5 * 60 * 1000)
+    return { ...e, computed_online: isOnline }
+  })
+  staffWithPresence.sort((a, b) => {
+    if (a.computed_online && !b.computed_online) return -1
+    if (!a.computed_online && b.computed_online) return 1
+    if (a.last_seen && b.last_seen) return new Date(b.last_seen).getTime() - new Date(a.last_seen).getTime()
+    if (a.last_seen && !b.last_seen) return -1
+    if (!a.last_seen && b.last_seen) return 1
+    return a.name.localeCompare(b.name)
+  })
+  const onlineCount = staffWithPresence.filter(s => s.computed_online).length
+  const offlineCount = staffWithPresence.length - onlineCount
+
   const stats = [
     { label: "Agendamentos Hoje", value: todayApts.length, icon: CalendarDays, gradient: "linear-gradient(135deg, #7c5cfc, #a78bfa)", shadow: "rgba(124,92,252,0.25)" },
     { label: "Próximos", value: confirmedApts.length, icon: Clock, gradient: "linear-gradient(135deg, #5b8def, #93b5f5)", shadow: "rgba(91,141,239,0.25)" },
     { label: "Serviços Ativos", value: services.filter(s => s.is_active).length, icon: Scissors, gradient: "linear-gradient(135deg, #22c997, #5ee0b8)", shadow: "rgba(34,201,151,0.25)" },
-    { label: "Profissionais", value: employees.filter(e => e.is_active).length, icon: Users, gradient: "linear-gradient(135deg, #ffb547, #ffd08a)", shadow: "rgba(255,181,71,0.25)" },
+    { label: "Profissionais Online", value: onlineCount, icon: Users, gradient: "linear-gradient(135deg, #ffb547, #ffd08a)", shadow: "rgba(255,181,71,0.25)" },
     { label: "Clientes", value: clients.length, icon: UserCheck, gradient: "linear-gradient(135deg, #e879a0, #f0a5bd)", shadow: "rgba(232,121,160,0.25)" },
     { label: "Receita do Mês", value: formatCurrency(monthRevenue), icon: TrendingUp, gradient: "linear-gradient(135deg, #22c997, #2dd4a8)", shadow: "rgba(34,201,151,0.25)" },
     { label: "Despesas do Mês", value: formatCurrency(monthExpenses), icon: CreditCard, gradient: "linear-gradient(135deg, #f25c5c, #f78888)", shadow: "rgba(242,92,92,0.25)" },
@@ -87,22 +110,7 @@ export default function AdminDashboardPage() {
     confirmed: "Confirmado", pending: "Pendente", completed: "Concluído", cancelled: "Cancelado", in_progress: "Em andamento",
   }
 
-  // Staff Presence
-  const staffMembers = employees.filter(e => e.is_active !== false)
-  const staffWithPresence = staffMembers.map(e => {
-    const isOnline = e.is_online || (e.last_seen && new Date().getTime() - new Date(e.last_seen).getTime() < 5 * 60 * 1000)
-    return { ...e, computed_online: isOnline }
-  })
-  staffWithPresence.sort((a, b) => {
-    if (a.computed_online && !b.computed_online) return -1
-    if (!a.computed_online && b.computed_online) return 1
-    if (a.last_seen && b.last_seen) return new Date(b.last_seen).getTime() - new Date(a.last_seen).getTime()
-    if (a.last_seen && !b.last_seen) return -1
-    if (!a.last_seen && b.last_seen) return 1
-    return a.name.localeCompare(b.name)
-  })
-  const onlineCount = staffWithPresence.filter(s => s.computed_online).length
-  const offlineCount = staffWithPresence.length - onlineCount
+
 
   // ── Shared Styles ──
   const card: React.CSSProperties = { background: '#fff', borderRadius: '1rem', border: '1px solid #e8ecf4', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }

@@ -399,10 +399,10 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     // Set online immediately
     updatePresence(true)
     
-    // Heartbeat every 2 minutes
+    // Heartbeat every 30 seconds
     const intervalId = setInterval(() => {
       updatePresence(true)
-    }, 2 * 60 * 1000)
+    }, 30 * 1000)
 
     // Handle window close
     const handleBeforeUnload = () => {

@@ -69,8 +69,8 @@ export default function AdminDashboardPage() {
   // Staff Presence
   const staffMembers = employees.filter(e => e.is_active !== false)
   const staffWithPresence = staffMembers.map(e => {
-    const isOnline = e.is_online || (e.last_seen && new Date().getTime() - new Date(e.last_seen).getTime() < 5 * 60 * 1000)
-    return { ...e, computed_online: isOnline }
+    const isOnline = e.is_online === true && (e.last_seen && new Date().getTime() - new Date(e.last_seen).getTime() < 1 * 60 * 1000)
+    return { ...e, computed_online: !!isOnline }
   })
   staffWithPresence.sort((a, b) => {
     if (a.computed_online && !b.computed_online) return -1

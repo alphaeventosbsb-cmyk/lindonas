@@ -4,8 +4,9 @@ import { useEffect, useState } from "react"
 import { fetchCollection, createDocument, updateDocument } from "@/lib/firebase/client-utils"
 import { useTenant } from "@/lib/auth/tenant-context"
 import type { BusinessSettings, BusinessHour, BlockedDate, Company } from "@/lib/types/database"
-import { Loader2, Save, Store, Clock, Plus, Trash2, X, Ban, Building2, Palette, Upload, Image, Camera, UserPlus, ShieldCheck, Mail } from "lucide-react"
+import { Loader2, Save, Store, Clock, Plus, Trash2, X, Ban, Building2, Palette, Upload, Image, Camera, UserPlus, ShieldCheck, Mail, AlertTriangle } from "lucide-react"
 import { toast } from "sonner"
+import SystemCleanupModal from "@/components/admin/system-cleanup-modal"
 
 const weekDays = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"]
 
@@ -34,8 +35,10 @@ export default function ConfiguracoesPage() {
   const [adminEmails, setAdminEmails] = useState<string[]>([])
   const [newAdminEmail, setNewAdminEmail] = useState("")
   const [savingAdmin, setSavingAdmin] = useState(false)
+  const [showCleanupModal, setShowCleanupModal] = useState(false)
 
-  const { companyId, company: tenantCompany } = useTenant()
+  const { companyId, company: tenantCompany, isSuperAdmin: isSuperAdminUser, isOwner } = useTenant()
+  const canAccessCleanup = isSuperAdminUser || isOwner
 
   useEffect(() => {
     async function load() {
@@ -471,6 +474,37 @@ export default function ConfiguracoesPage() {
           )}
         </div>
       </div>
+
+      {/* System Cleanup - Admin Only */}
+      {canAccessCleanup && (
+        <div style={{ background: '#fff', borderRadius: '1rem', border: '1px solid #fecaca', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+          {sectionHeader(<AlertTriangle className="w-5 h-5" style={{ color: '#fff' }} />, "Limpeza do Sistema", "Apagar dados para recomeçar do zero", "linear-gradient(135deg, #dc2626, #ef4444)")}
+          <div style={{ padding: '1.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', padding: '0.875rem 1rem', background: '#fef2f2', borderRadius: '0.75rem', border: '1px solid #fecaca', marginBottom: '1.25rem' }}>
+              <AlertTriangle style={{ width: '1.125rem', height: '1.125rem', color: '#dc2626', flexShrink: 0, marginTop: '0.0625rem' }} />
+              <p style={{ fontSize: '0.8125rem', color: '#991b1b', lineHeight: 1.6 }}>
+                Use esta opção <strong>apenas se desejar apagar dados do sistema</strong>. Essa ação não poderá ser desfeita. Configurações, login, permissões e dados do estabelecimento serão preservados.
+              </p>
+            </div>
+            <button
+              onClick={() => setShowCleanupModal(true)}
+              style={{
+                padding: '0.625rem 1.25rem', borderRadius: '0.75rem',
+                color: '#fff', fontWeight: 700, fontSize: '0.875rem',
+                display: 'flex', alignItems: 'center', gap: '0.5rem',
+                border: 'none', cursor: 'pointer',
+                background: 'linear-gradient(135deg, #dc2626, #ef4444)',
+                boxShadow: '0 4px 14px rgba(220,38,38,0.3)',
+              }}
+            >
+              <Trash2 className="w-4 h-4" /> Limpeza do Sistema
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* System Cleanup Modal */}
+      <SystemCleanupModal open={showCleanupModal} onClose={() => setShowCleanupModal(false)} />
 
       {/* Block Date Modal */}
       {showBlockModal && (

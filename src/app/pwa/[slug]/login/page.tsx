@@ -142,7 +142,7 @@ function LoginForm({ slug }: { slug: string }) {
       {/* Top Section - Logo */}
       <div className="relative z-10 flex flex-col items-center justify-center pt-20 pb-16 h-[35vh]">
         {companyData?.logo_url ? (
-          <img src={companyData.logo_url} alt="Logo" className="h-24 w-auto drop-shadow-xl" />
+          <img src={companyData.logo_url} alt="Logo" className="h-24 w-auto max-w-[200px] object-contain rounded-[20px] shadow-[0_10px_25px_rgba(0,0,0,0.2)]" />
         ) : (
           <div className="flex flex-col items-center gap-2">
             <div className="text-white">
@@ -176,7 +176,8 @@ function LoginForm({ slug }: { slug: string }) {
             <input 
               type="email" 
               placeholder="E-mail ou telefone" 
-              className="w-full h-14 pl-14 pr-5 bg-white border border-gray-200 rounded-[20px] focus:border-[#7C5CFC] focus:ring-4 focus:ring-[#7C5CFC]/10 outline-none transition-all font-medium text-[#111827] placeholder:text-gray-400 placeholder:font-normal shadow-sm"
+              style={{ paddingLeft: '52px' }}
+              className="w-full h-14 pr-5 bg-white border border-gray-200 rounded-[20px] focus:border-[#7C5CFC] focus:ring-4 focus:ring-[#7C5CFC]/10 outline-none transition-all font-medium text-[#111827] placeholder:text-gray-400 placeholder:font-normal shadow-sm"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
@@ -189,7 +190,8 @@ function LoginForm({ slug }: { slug: string }) {
             <input 
               type={showPassword ? "text" : "password"} 
               placeholder="Senha" 
-              className="w-full h-14 pl-14 pr-12 bg-white border border-gray-200 rounded-[20px] focus:border-[#7C5CFC] focus:ring-4 focus:ring-[#7C5CFC]/10 outline-none transition-all font-medium text-[#111827] placeholder:text-gray-400 placeholder:font-normal shadow-sm"
+              style={{ paddingLeft: '52px' }}
+              className="w-full h-14 pr-12 bg-white border border-gray-200 rounded-[20px] focus:border-[#7C5CFC] focus:ring-4 focus:ring-[#7C5CFC]/10 outline-none transition-all font-medium text-[#111827] placeholder:text-gray-400 placeholder:font-normal shadow-sm"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required

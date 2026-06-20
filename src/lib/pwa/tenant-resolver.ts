@@ -4,10 +4,30 @@ import { collection, query, where, getDocs, limit } from "firebase/firestore"
 export async function resolvePWATenantBySlug(slug: string) {
   try {
     const normalizedSlug = slug.trim().toLowerCase()
+    
+    // 1. Prioridade máxima: Buscar via API Server-side (Ignora regras de segurança do cliente)
+    try {
+      const res = await fetch(`/api/public-booking/${normalizedSlug}`)
+      if (res.ok) {
+        const data = await res.json()
+        if (data && data.company) {
+          return {
+            id: data.company.id,
+            name: data.company.name,
+            logo_url: data.company.logo_url || null,
+            ...data.company
+          }
+        }
+      }
+    } catch (apiErr) {
+      console.warn("Falha na API de public-booking, tentando client-side:", apiErr)
+    }
+
+    // 2. Fallback: Firebase Client SDK
     const db = getDb()
     const companiesRef = collection(db, "companies")
 
-    // 1. Buscar por slug == "lindonas"
+    // Buscar por slug == "lindonas"
     let q = query(companiesRef, where("slug", "==", normalizedSlug), limit(1))
     let snap = await getDocs(q)
     if (!snap.empty) {

@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from "react"
 import { usePWATenant } from "@/components/pwa/pwa-tenant-context"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { Loader2, ArrowLeft, CalendarDays, Clock, User, Scissors, CheckCircle } from "lucide-react"
+import { Loader2, ArrowLeft, CalendarDays, Clock, User, Scissors, CheckCircle, Search, Droplets, Wind, Sparkles } from "lucide-react"
 import Link from "next/link"
 import { format, addDays, startOfToday } from "date-fns"
 import { ptBR } from "date-fns/locale"
@@ -30,6 +30,7 @@ export default function PWAClientBooking() {
   const [selectedProfessional, setSelectedProfessional] = useState<any>(null)
   const [selectedDate, setSelectedDate] = useState<Date>(startOfToday())
   const [selectedTime, setSelectedTime] = useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = useState("")
 
   useEffect(() => {
     async function loadPublicData() {
@@ -48,6 +49,21 @@ export default function PWAClientBooking() {
     }
     loadPublicData()
   }, [slug])
+
+  const filteredServices = useMemo(() => {
+    if (!data?.services) return []
+    if (!searchQuery) return data.services
+    return data.services.filter((s: any) => s.name.toLowerCase().includes(searchQuery.toLowerCase()))
+  }, [data, searchQuery])
+
+  // Get a random icon based on index to mimic the mockup's variety, or assign based on name
+  const getServiceIcon = (name: string) => {
+    const lower = name.toLowerCase()
+    if (lower.includes('hidrata') || lower.includes('lavagem')) return Droplets
+    if (lower.includes('escova') || lower.includes('secagem')) return Wind
+    if (lower.includes('botox') || lower.includes('progressiva') || lower.includes('alisamento')) return Sparkles
+    return Scissors
+  }
 
   const availableProfessionals = useMemo(() => {
     if (!data || !selectedService) return []
@@ -191,8 +207,8 @@ export default function PWAClientBooking() {
   }
 
   return (
-    <div className="flex flex-col h-full bg-[#F7F8FC]">
-      <div className="bg-white px-4 py-4 flex items-center border-b border-gray-100 sticky top-0 z-10 shadow-sm">
+    <div className="flex flex-col min-h-screen bg-white">
+      <div className="bg-white px-4 py-4 flex items-center justify-between sticky top-0 z-10">
         <button 
           onClick={() => {
             if (step === "confirm") setStep("datetime")
@@ -200,30 +216,64 @@ export default function PWAClientBooking() {
             else if (step === "professional") setStep("service")
             else router.push(`/pwa/${slug}/cliente/home`)
           }} 
-          className="p-2 -ml-2 rounded-xl text-[#111827] hover:bg-gray-100 transition-colors"
+          className="p-2 -ml-2 rounded-xl text-[#111827]"
         >
           <ArrowLeft className="w-6 h-6" />
         </button>
-        <h1 className="text-[18px] font-bold text-[#111827] ml-2">Novo Agendamento</h1>
+        <h1 className="text-[17px] font-bold text-[#111827] absolute left-1/2 -translate-x-1/2">
+          Novo agendamento
+        </h1>
+        <div className="w-10" /> {/* Spacer for centering */}
       </div>
 
-      <div className="p-5 pb-32">
+      <div className="px-6 pt-4 pb-32">
         {step === "service" && (
-          <div className="space-y-4">
-            <div className="mb-6">
-              <h2 className="text-xl font-bold text-[#111827]">Escolha o serviço</h2>
-              <p className="text-[#6B7280] text-sm">Selecione o serviço que deseja realizar.</p>
-            </div>
-            {data?.services?.map((svc: any) => (
-              <PwaServiceCard
-                key={svc.id}
-                name={svc.name}
-                duration={svc.duration_minutes}
-                price={svc.promotional_price || svc.price}
-                icon={Scissors}
-                onClick={() => { setSelectedService(svc); setStep("professional") }}
+          <div className="flex flex-col h-full relative">
+            <h2 className="text-[17px] font-bold text-[#111827] mb-4">1. Escolha o serviço</h2>
+            
+            <div className="relative mb-6">
+              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                <Search className="h-[18px] w-[18px] text-gray-400" />
+              </div>
+              <input
+                type="text"
+                className="w-full h-12 pl-11 pr-4 bg-white border border-gray-200 rounded-[14px] text-[15px] focus:outline-none focus:border-[#5D3FD3] focus:ring-1 focus:ring-[#5D3FD3] shadow-sm transition-all placeholder:text-gray-400 text-[#111827]"
+                placeholder="Buscar serviço..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
               />
-            ))}
+            </div>
+
+            <div className="space-y-3 pb-8">
+              {filteredServices.map((svc: any) => (
+                <PwaServiceCard
+                  key={svc.id}
+                  name={svc.name}
+                  duration={svc.duration_minutes}
+                  price={svc.promotional_price || svc.price}
+                  icon={getServiceIcon(svc.name)}
+                  selected={selectedService?.id === svc.id}
+                  onClick={() => setSelectedService(svc)}
+                />
+              ))}
+              
+              {filteredServices.length === 0 && (
+                <div className="text-center py-10 text-gray-500 font-medium text-[15px]">
+                  Nenhum serviço encontrado.
+                </div>
+              )}
+            </div>
+
+            {selectedService && (
+              <div className="fixed bottom-0 left-0 w-full max-w-[430px] p-6 bg-white/80 backdrop-blur-md pb-[env(safe-area-inset-bottom,24px)] flex items-center justify-center ml-auto mr-auto z-50" style={{ left: '50%', transform: 'translateX(-50%)' }}>
+                <PwaButton 
+                  onClick={() => setStep("professional")} 
+                  className="w-full h-14 bg-[#5D3FD3] hover:bg-[#4A2CA8] text-white font-bold text-[16px] rounded-[16px] shadow-[0_8px_20px_rgba(93,63,211,0.25)]"
+                >
+                  Continuar
+                </PwaButton>
+              </div>
+            )}
           </div>
         )}
 

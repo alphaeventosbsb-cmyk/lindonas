@@ -220,9 +220,11 @@ export default function PWAClientBooking() {
         >
           <ArrowLeft className="w-6 h-6" />
         </button>
-        <h1 className="text-[17px] font-bold text-[#111827] absolute left-1/2 -translate-x-1/2">
-          Novo agendamento
-        </h1>
+        <div className="absolute left-1/2 -translate-x-1/2 bg-[#F5F3FF] border border-[#EDE9FE] px-4 py-1.5 rounded-full shadow-[0_2px_8px_rgba(93,63,211,0.08)]">
+          <h1 className="text-[15px] font-bold text-[#5D3FD3]">
+            Novo agendamento
+          </h1>
+        </div>
         <div className="w-10" /> {/* Spacer for centering */}
       </div>
 
@@ -237,7 +239,8 @@ export default function PWAClientBooking() {
               </div>
               <input
                 type="text"
-                className="w-full h-12 pl-11 pr-4 bg-white border border-gray-200 rounded-[14px] text-[15px] focus:outline-none focus:border-[#5D3FD3] focus:ring-1 focus:ring-[#5D3FD3] shadow-sm transition-all placeholder:text-gray-400 text-[#111827]"
+                className="w-full h-12 pr-4 bg-white border border-gray-200 rounded-[14px] text-[15px] focus:outline-none focus:border-[#5D3FD3] focus:ring-1 focus:ring-[#5D3FD3] shadow-sm transition-all placeholder:text-gray-400 text-[#111827]"
+                style={{ paddingLeft: '44px' }}
                 placeholder="Buscar serviço..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}

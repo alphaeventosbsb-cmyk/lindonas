@@ -119,7 +119,10 @@ export default function ClientesPage() {
       await deleteDocument("clients", id)
       toast.success("Cliente excluído")
       load()
-    } catch { toast.error("Erro ao excluir cliente") }
+    } catch (error: any) { 
+      console.error("Delete client error:", error)
+      toast.error(error?.message || "Erro ao excluir cliente") 
+    }
   }
 
   const handleBulkDelete = async () => {

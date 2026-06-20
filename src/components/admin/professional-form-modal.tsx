@@ -178,7 +178,22 @@ export function ProfessionalFormModal({ employee, onClose, onSave, onDelete, bus
         rbac_profile_custom: rbacProfileCustom,
       }
       const oldUrl = (photoFile || !photoUrl) ? (employee?.photo_url || null) : null
-      await onSave(data, photoFile, oldUrl)
+      
+      const cleanUndefined = (obj: any): any => {
+        if (obj === null || obj === undefined) return obj;
+        if (Array.isArray(obj)) return obj.map(cleanUndefined).filter(v => v !== undefined);
+        if (typeof obj === 'object') {
+          return Object.fromEntries(
+            Object.entries(obj)
+              .map(([k, v]) => [k, cleanUndefined(v)])
+              .filter(([_, v]) => v !== undefined)
+          );
+        }
+        return obj;
+      };
+      
+      const cleanData = cleanUndefined(data);
+      await onSave(cleanData, photoFile, oldUrl)
     } catch (err) {
       console.error('Erro ao salvar:', err)
       alert('Erro ao salvar profissional')

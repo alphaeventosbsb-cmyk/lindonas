@@ -2,6 +2,7 @@ import type { Metadata } from "next"
 import { PWATenantProvider } from "@/components/pwa/pwa-tenant-context"
 import { PWAWrapper } from "@/components/pwa/pwa-wrapper"
 import { PwaRegistry } from "@/components/pwa/pwa-registry"
+import { PwaShell } from "@/components/pwa/ui/pwa-shell"
 
 export const metadata: Metadata = {
   title: "Lindonas App",
@@ -20,13 +21,13 @@ export default async function PWALayout({
   return (
     <PWATenantProvider slug={slug}>
       <PwaRegistry />
-      <div className="flex flex-col h-[100dvh] bg-[var(--color-background)] overflow-hidden w-full max-w-md mx-auto relative shadow-2xl">
-        <div className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-hide pb-20 relative">
+      <PwaShell>
+        <div className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-hide pb-24 relative">
           <PWAWrapper>
             {children}
           </PWAWrapper>
         </div>
-      </div>
+      </PwaShell>
     </PWATenantProvider>
   )
 }

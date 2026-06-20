@@ -11,6 +11,10 @@ import { getDb } from "@/lib/firebase/config"
 import { collection, query, where, getDocs } from "firebase/firestore"
 import { useRouter } from "next/navigation"
 
+import { PwaCard } from "@/components/pwa/ui/pwa-card"
+import { PwaEmptyState } from "@/components/pwa/ui/pwa-empty-state"
+import { PwaButton } from "@/components/pwa/ui/pwa-button"
+
 export default function ClientAppointments() {
   const { companyId, user, slug } = usePWATenant()
   const [appointments, setAppointments] = useState<any[]>([])
@@ -37,7 +41,6 @@ export default function ClientAppointments() {
         const snap = await getDocs(q)
         const appts = snap.docs.map(d => ({ id: d.id, ...d.data() }))
         
-        // Sort by date/time ascending
         appts.sort((a: any, b: any) => {
           const dtA = parseISO(`${a.date?.split('T')[0] || a.appointment_date}T${a.start_time || a.appointment_time}:00`).getTime()
           const dtB = parseISO(`${b.date?.split('T')[0] || b.appointment_date}T${b.start_time || b.appointment_time}:00`).getTime()
@@ -55,57 +58,66 @@ export default function ClientAppointments() {
   }, [companyId, user?.uid])
 
   return (
-    <div className="flex flex-col h-full bg-[#f8fafc]">
-      <div className="bg-white px-4 py-4 flex items-center border-b border-gray-100 sticky top-0 z-10">
-        <button onClick={() => router.back()} className="p-2 -ml-2 rounded-xl text-gray-700 hover:bg-gray-100">
+    <div className="flex flex-col h-full bg-[#F7F8FC]">
+      <div className="bg-white px-4 py-4 flex items-center border-b border-gray-100 sticky top-0 z-10 shadow-sm">
+        <button onClick={() => router.back()} className="p-2 -ml-2 rounded-xl text-[#111827] hover:bg-gray-100 transition-colors">
           <ArrowLeft className="w-6 h-6" />
         </button>
-        <h1 className="text-lg font-bold text-gray-900 ml-2">Meus Horários</h1>
+        <h1 className="text-[18px] font-bold text-[#111827] ml-2">Meus Horários</h1>
       </div>
 
-      <div className="p-4 pb-24 space-y-4">
+      <div className="p-5 pb-32 space-y-4">
         {loading ? (
           <div className="flex justify-center p-8">
-            <div className="w-8 h-8 rounded-full border-4 border-[var(--color-primary)] border-t-transparent animate-spin" />
+            <div className="w-8 h-8 rounded-full border-4 border-[#7C5CFC] border-t-transparent animate-spin" />
           </div>
         ) : appointments.length > 0 ? (
           appointments.map((appt) => (
-            <div key={appt.id} className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 relative overflow-hidden">
-              <div className="absolute top-0 left-0 w-1 h-full bg-[var(--color-primary)]" />
+            <PwaCard key={appt.id} className="relative overflow-hidden border border-gray-100 pl-5">
+              <div className="absolute top-0 left-0 w-1.5 h-full bg-[#7C5CFC]" />
               <div className="flex justify-between items-start mb-4">
                 <div>
-                  <p className="font-bold text-gray-900 text-lg capitalize">
+                  <p className="font-bold text-[#111827] text-[16px] capitalize">
                     {format(parseISO(appt.appointment_date || appt.date), "EEEE, dd 'de' MMMM", { locale: ptBR })}
                   </p>
-                  <p className="text-sm text-[var(--color-primary)] font-bold flex items-center gap-1 mt-1">
-                    <Clock className="w-4 h-4" /> {appt.appointment_time || appt.start_time} - {appt.end_time}
+                  <p className="text-[14px] text-[#7C5CFC] font-bold flex items-center gap-1.5 mt-1.5">
+                    <Clock className="w-4 h-4" /> {appt.appointment_time || appt.start_time} - {appt.end_time || addMinutesToTime(appt.appointment_time || appt.start_time, appt.duration_minutes || 30)}
                   </p>
                 </div>
               </div>
               
-              <div className="bg-gray-50 rounded-xl p-3 space-y-2 border border-gray-100">
-                <div className="flex items-center gap-2">
-                  <Scissors className="w-4 h-4 text-gray-500" />
-                  <span className="font-bold text-sm text-gray-900">{appt.service_name}</span>
+              <div className="bg-[#F9FAFB] rounded-[16px] p-3 space-y-2.5 border border-gray-50">
+                <div className="flex items-center gap-3">
+                  <div className="bg-white p-1.5 rounded-lg shadow-sm">
+                    <Scissors className="w-4 h-4 text-gray-500" />
+                  </div>
+                  <span className="font-bold text-[14px] text-[#111827]">{appt.service_name}</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <User className="w-4 h-4 text-gray-500" />
-                  <span className="text-xs text-gray-600">Com {appt.employee_name}</span>
+                <div className="flex items-center gap-3">
+                  <div className="bg-white p-1.5 rounded-lg shadow-sm">
+                    <User className="w-4 h-4 text-gray-500" />
+                  </div>
+                  <span className="text-[13px] text-[#6B7280]">Com {appt.employee_name}</span>
                 </div>
               </div>
-            </div>
+            </PwaCard>
           ))
         ) : (
-          <div className="bg-white rounded-2xl p-8 text-center border border-dashed border-gray-200">
-            <CalendarDays className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-gray-900 font-bold mb-2">Sem horários marcados</h3>
-            <p className="text-sm text-gray-500 mb-6">Você ainda não tem nenhum agendamento futuro.</p>
-            <Link href={`/pwa/${slug}/cliente/agendar`} className="inline-flex h-10 px-6 bg-[var(--color-primary)] text-white font-bold rounded-xl items-center justify-center">
-              Agendar Agora
-            </Link>
-          </div>
+          <PwaCard className="bg-transparent shadow-none border-dashed border-2 border-gray-200 mt-4">
+            <PwaEmptyState 
+              icon={CalendarDays}
+              title="Sem horários marcados"
+              description="Você ainda não tem nenhum agendamento futuro no salão."
+              action={
+                <PwaButton onClick={() => router.push(`/pwa/${slug}/cliente/agendar`)}>
+                  Agendar Agora
+                </PwaButton>
+              }
+            />
+          </PwaCard>
         )}
       </div>
     </div>
   )
 }
+

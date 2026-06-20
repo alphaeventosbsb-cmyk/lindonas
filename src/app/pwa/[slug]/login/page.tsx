@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense, use } from "react"
 import { getAuthInstance, googleProvider } from "@/lib/firebase/config"
 import { signInWithPopup, signInWithEmailAndPassword } from "firebase/auth"
 import { fetchCollectionWhere, createDocument, updateDocument } from "@/lib/firebase/client-utils"

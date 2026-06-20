@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 import { getAuthInstance } from "@/lib/firebase/config"
 import { onAuthStateChanged, type User } from "firebase/auth"
 import { createDocument, fetchCollectionWhere, getDocument, updateDocument } from "@/lib/firebase/client-utils"
-import { doc, onSnapshot } from "firebase/firestore"
+import { doc, onSnapshot, collection, getDocs } from "firebase/firestore"
 import { getDb } from "@/lib/firebase/config"
 import type { SaaSUser, Company, Employee, EmployeePermissions } from "@/lib/types/database"
 import { ALL_PERMISSION_KEYS } from "@/lib/rbac/rbac-types"
@@ -261,9 +261,6 @@ export function TenantProvider({ children }: { children: ReactNode }) {
 
       // Legacy company co-admin support. Professional links above always win.
       if (users.length === 0 && firebaseUser.email) {
-        const { collection, getDocs } = await import("firebase/firestore")
-        const { getDb } = await import("@/lib/firebase/config")
-
         let matchedCompanyId: string | null = null
         const normalizedEmail = normalizeAuthEmail(firebaseUser.email)
 
@@ -351,7 +348,18 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       resetTenantState()
 
       if (u) {
-        await loadUserData(u)
+        try {
+          // Safety timeout: if loadUserData hangs for more than 15s, force loading to false
+          const timeoutId = setTimeout(() => {
+            console.warn("TenantProvider: loadUserData timeout (15s) — forcing loading=false")
+            setLoading(false)
+          }, 15000)
+          
+          await loadUserData(u)
+          clearTimeout(timeoutId)
+        } catch (err) {
+          console.error("TenantProvider: loadUserData error:", err)
+        }
       }
 
       setLoading(false)

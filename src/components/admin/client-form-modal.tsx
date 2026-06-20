@@ -170,7 +170,9 @@ export function ClientFormModal({ client, onClose, onSave }: Props) {
       whatsapp: whatsapp.replace(/\D/g, "") || null,
       is_whatsapp: isWhatsapp,
       email: email.trim() || null,
-      address: Object.values(address).some(v => v) ? address : null,
+      address: Object.values(address).some(v => v) 
+        ? Object.fromEntries(Object.entries(address).filter(([_, v]) => v !== undefined && v !== ""))
+        : null,
       notes: notes.trim() || null,
       instagram: instagram.trim() || null,
       referral_source: referralSource || null,

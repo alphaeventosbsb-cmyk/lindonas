@@ -57,7 +57,8 @@ export default function ClientesPage() {
   const openEdit = (c: Client) => { setEditing(c); setShowForm(true) }
 
   const handleSave = async (data: any, photoFile: File | null, oldPhotoUrl: string | null) => {
-    if (!canEdit) { toast.error('Sem permissão'); return }
+    if (editing && !canEdit) { toast.error('Sem permissão para editar'); return }
+    if (!editing && !canCreate) { toast.error('Sem permissão para cadastrar'); return }
     try {
       let photoUrl = data.photo_url || editing?.photo_url || null
 

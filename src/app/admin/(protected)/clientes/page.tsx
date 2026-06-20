@@ -115,11 +115,14 @@ export default function ClientesPage() {
       variant: "danger",
     })
     if (!confirmed) return
+    const toastId = toast.loading("Processando exclusão...")
     try {
       await deleteDocument("clients", id)
+      toast.dismiss(toastId)
       toast.success("Cliente excluído")
       load()
     } catch (error: any) { 
+      toast.dismiss(toastId)
       console.error("Delete client error:", error)
       toast.error(error?.message || "Erro ao excluir cliente") 
     }

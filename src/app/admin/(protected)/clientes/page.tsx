@@ -106,7 +106,7 @@ export default function ClientesPage() {
   }
 
   const handleDelete = async (id: string, name: string) => {
-    if (!canEdit) { toast.error('Sem permissão'); return }
+    if (!canDelete) { toast.error('Sem permissão para excluir'); return }
     const confirmed = await confirm({
       title: "Excluir cliente",
       message: `Tem certeza que deseja excluir este cliente?\n\nCliente: ${name}\n\nEssa ação não poderá ser desfeita.`,
@@ -123,7 +123,7 @@ export default function ClientesPage() {
   }
 
   const handleBulkDelete = async () => {
-    if (!canEdit) { toast.error('Sem permissão'); return }
+    if (!canDelete) { toast.error('Sem permissão para excluir'); return }
     const ids = Array.from(selectedIds)
     const names = ids.map(id => clients.find(c => c.id === id)?.name || "Cliente")
     const listText = names.length <= 5

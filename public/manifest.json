@@ -1,8 +1,8 @@
 {
-  "name": "Agendamento Online",
-  "short_name": "Agendar",
-  "description": "Agende seus serviços de forma rápida e prática.",
-  "start_url": "/",
+  "name": "Lindonas App",
+  "short_name": "Lindonas",
+  "description": "App Oficial do Salão Lindonas",
+  "start_url": "/pwa/login",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#f4f6fb",

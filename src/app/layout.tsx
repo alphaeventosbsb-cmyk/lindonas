@@ -10,7 +10,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Agendar",
+    title: "Lindonas",
   },
   other: {
     "mobile-web-app-capable": "yes",

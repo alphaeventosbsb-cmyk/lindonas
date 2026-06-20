@@ -212,11 +212,24 @@ export default function ConvitePage({ params }: { params: Promise<{ token: strin
         )
 
       case "used":
-        return renderError(
-          <CheckCircle style={{ width: '2rem', height: '2rem', color: '#3b82f6' }} />,
-          '#eff6ff', '#bfdbfe',
-          'Convite já utilizado',
-          'Este convite já foi aceito. Você já pode fazer login normalmente no painel.'
+        return (
+          <>
+            {renderError(
+              <CheckCircle style={{ width: '2rem', height: '2rem', color: '#3b82f6' }} />,
+              '#eff6ff', '#bfdbfe',
+              'Convite já utilizado',
+              'Este convite já foi aceito. Você já pode fazer login normalmente no painel.'
+            )}
+            <button onClick={() => { window.location.href = '/admin' }} style={{
+              width: '100%', padding: '0.875rem', borderRadius: '0.75rem', border: 'none',
+              background: 'linear-gradient(135deg, #7c5cfc, #a78bfa)', color: '#fff',
+              fontWeight: 700, fontSize: '0.9375rem', cursor: 'pointer', marginTop: '0.5rem',
+              boxShadow: '0 4px 14px rgba(124,92,252,0.25)', display: 'flex',
+              alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
+            }}>
+              Ir para o painel <ArrowRight style={{ width: '16px', height: '16px' }} />
+            </button>
+          </>
         )
 
       case "unauthorized":

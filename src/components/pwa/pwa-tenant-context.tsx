@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react"
 import { fetchCollectionWhere } from "@/lib/firebase/client-utils"
+import { resolvePWATenantBySlug } from "@/lib/pwa/tenant-resolver"
 import { getAuthInstance } from "@/lib/firebase/config"
 import { onAuthStateChanged, type User } from "firebase/auth"
 
@@ -33,11 +34,13 @@ export function PWATenantProvider({ slug, children }: { slug: string, children: 
   useEffect(() => {
     async function init() {
       try {
-        const companies = await fetchCollectionWhere("companies", "slug", "==", slug)
-        if (companies && companies.length > 0) {
-          setCompanyId(companies[0].id)
-          setCompanyName(companies[0].name)
-          setCompanyLogo(companies[0].logo_url || null)
+        const company = await resolvePWATenantBySlug(slug)
+        if (company) {
+          setCompanyId(company.id)
+          setCompanyName(company.name || company.business_name)
+          setCompanyLogo(company.logo_url || null)
+        } else {
+          console.error(`Slug recebido: ${slug}\nNenhum estabelecimento encontrado com esse slug\nVerifique se existe pwa_slug ou slug no documento settings/company`)
         }
       } catch (err) {
         console.error("Failed to load PWA tenant:", err)

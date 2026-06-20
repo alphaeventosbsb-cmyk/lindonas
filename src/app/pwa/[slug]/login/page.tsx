@@ -1,9 +1,10 @@
 "use client"
 
-import { useState, useEffect, Suspense, use } from "react"
+import { useState, useEffect } from "react"
 import { getAuthInstance, googleProvider } from "@/lib/firebase/config"
 import { signInWithPopup, signInWithEmailAndPassword } from "firebase/auth"
 import { fetchCollectionWhere, createDocument, updateDocument } from "@/lib/firebase/client-utils"
+import { resolvePWATenantBySlug } from "@/lib/pwa/tenant-resolver"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Loader2, ArrowLeft } from "lucide-react"
 import Link from "next/link"
@@ -22,11 +23,11 @@ function LoginForm({ slug }: { slug: string }) {
   useEffect(() => {
     async function loadCompany() {
       try {
-        const companies = await fetchCollectionWhere("companies", "slug", "==", slug)
-        if (companies && companies.length > 0) {
-          setCompanyId(companies[0].id)
+        const company = await resolvePWATenantBySlug(slug)
+        if (company) {
+          setCompanyId(company.id)
         } else {
-          setError("Estabelecimento não encontrado.")
+          setError(`Slug recebido: ${slug}\nNenhum estabelecimento encontrado com esse slug\nVerifique se existe pwa_slug ou slug no documento settings/company`)
         }
       } catch (err) {
         setError("Erro ao carregar dados do salão.")
@@ -133,7 +134,7 @@ function LoginForm({ slug }: { slug: string }) {
   }
 
   return (
-    <div className="min-h-[100dvh] flex flex-col p-6 bg-[var(--color-background)]">
+    <div className="min-h-[100dvh] flex flex-col p-6 bg-[var(--color-background)] w-full max-w-[430px] mx-auto overflow-x-hidden">
       {/* Header com voltar */}
       <div className="pt-8 pb-6 flex items-center">
         <Link href={`/pwa/${slug}`} className="p-2 -ml-2 rounded-xl text-[#1e1e2d] hover:bg-gray-100">

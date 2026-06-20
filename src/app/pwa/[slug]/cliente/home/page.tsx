@@ -251,34 +251,28 @@ export default function ClientHome() {
 
         {/* Stats Row */}
         <div className="flex gap-2 mb-8">
-          <PwaCard className="flex-1 p-2.5 flex flex-col justify-between relative overflow-hidden group">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-[11px] font-bold text-[#6B7280]">Créditos</p>
-              <div className="w-6 h-6 rounded-full bg-[#ECFDF5] flex items-center justify-center flex-shrink-0">
-                <Wallet className="w-3 h-3 text-[#10B981]" />
-              </div>
+          <PwaCard className="flex-1 p-3 flex flex-col items-center justify-center text-center relative overflow-hidden group gap-1">
+            <div className="w-8 h-8 rounded-full bg-[#ECFDF5] flex items-center justify-center mb-1">
+              <Wallet className="w-4 h-4 text-[#10B981]" />
             </div>
-            <p className="text-[14px] font-bold text-[#10B981] whitespace-nowrap">R$ {(client?.credit_amount || 0).toFixed(2).replace('.', ',')}</p>
+            <p className="text-[11px] font-bold text-[#6B7280]">Créditos</p>
+            <p className="text-[14px] font-bold text-[#10B981] whitespace-nowrap mt-0.5">R$ {(client?.credit_amount || 0).toFixed(2).replace('.', ',')}</p>
           </PwaCard>
           
-          <PwaCard className="flex-1 p-2.5 flex flex-col justify-between relative overflow-hidden group">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-[11px] font-bold text-[#6B7280]">Débitos</p>
-              <div className="w-6 h-6 rounded-full bg-[#FEF2F2] flex items-center justify-center flex-shrink-0">
-                <ReceiptText className="w-3 h-3 text-[#EF4444]" />
-              </div>
+          <PwaCard className="flex-1 p-3 flex flex-col items-center justify-center text-center relative overflow-hidden group gap-1">
+            <div className="w-8 h-8 rounded-full bg-[#FEF2F2] flex items-center justify-center mb-1">
+              <ReceiptText className="w-4 h-4 text-[#EF4444]" />
             </div>
-            <p className="text-[14px] font-bold text-[#EF4444] whitespace-nowrap">R$ {(client?.debt_amount || 0).toFixed(2).replace('.', ',')}</p>
+            <p className="text-[11px] font-bold text-[#6B7280]">Débitos</p>
+            <p className="text-[14px] font-bold text-[#EF4444] whitespace-nowrap mt-0.5">R$ {(client?.debt_amount || 0).toFixed(2).replace('.', ',')}</p>
           </PwaCard>
 
-          <PwaCard className="flex-1 p-2.5 flex flex-col justify-between relative overflow-hidden group">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-[11px] font-bold text-[#6B7280]">Visitas</p>
-              <div className="w-6 h-6 rounded-full bg-[#F5F3FF] flex items-center justify-center flex-shrink-0">
-                <Award className="w-3 h-3 text-[#7C5CFC]" />
-              </div>
+          <PwaCard className="flex-1 p-3 flex flex-col items-center justify-center text-center relative overflow-hidden group gap-1">
+            <div className="w-8 h-8 rounded-full bg-[#F5F3FF] flex items-center justify-center mb-1">
+              <Award className="w-4 h-4 text-[#7C5CFC]" />
             </div>
-            <p className="text-[15px] font-bold text-[#5D3FD3] whitespace-nowrap">{client?.appointment_count || 0}</p>
+            <p className="text-[11px] font-bold text-[#6B7280]">Visitas</p>
+            <p className="text-[16px] font-bold text-[#5D3FD3] whitespace-nowrap mt-0.5">{client?.appointment_count || 0}</p>
           </PwaCard>
         </div>
 

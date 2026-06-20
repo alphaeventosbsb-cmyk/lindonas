@@ -49,9 +49,6 @@ export function PWABottomNav({ type }: { type: "cliente" | "profissional" }) {
             href={item.href}
             className="flex flex-col items-center justify-center w-16 gap-1 relative py-1"
           >
-            {isActive && (
-              <span className="absolute -top-3 w-8 h-1 bg-[#7C5CFC] rounded-b-full transition-all duration-300" />
-            )}
             <div className="relative">
               <Icon 
                 strokeWidth={isActive ? 2.5 : 2} 

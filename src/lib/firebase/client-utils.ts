@@ -154,7 +154,7 @@ export async function createAppointmentLog(
 ) {
   try {
     const colRef = collection(db(), "appointment_logs")
-    await addDoc(colRef, {
+    await withTimeout(addDoc(colRef, {
       appointment_id: appointmentId,
       action_type: actionType,
       action_label: actionLabel,
@@ -163,7 +163,7 @@ export async function createAppointmentLog(
       user_name: user?.name || "Sistema",
       user_role: user?.role || "system",
       created_at: new Date().toISOString()
-    })
+    }))
   } catch (err) {
     console.error("Error creating appointment log:", err)
   }
@@ -280,7 +280,7 @@ export async function createAuditLog(
 ) {
   try {
     const colRef = collection(db(), "audit_logs")
-    await addDoc(colRef, {
+    await withTimeout(addDoc(colRef, {
       module,
       action_type: actionType,
       description,
@@ -289,7 +289,7 @@ export async function createAuditLog(
       user_role: user?.role || "system",
       details,
       created_at: new Date().toISOString()
-    })
+    }))
   } catch (err) {
     console.error("Error creating audit log:", err)
   }
@@ -343,7 +343,7 @@ export async function deleteAppointment(
 
 export async function deleteDocument(collectionName: string, id: string) {
   const docRef = doc(db(), collectionName, id)
-  await deleteDoc(docRef)
+  await withTimeout(deleteDoc(docRef))
 }
 
 export async function getDocument<T>(collectionName: string, id: string): Promise<T | null> {

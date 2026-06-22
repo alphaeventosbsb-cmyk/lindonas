@@ -92,6 +92,7 @@ async function findLinkedEmployee(firebaseUser: User): Promise<Employee | null> 
 
 async function upsertProfessionalSaasUser(firebaseUser: User, employee: Employee, existingUser?: SaaSUser | null): Promise<SaaSUser> {
   const now = new Date().toISOString()
+  const newPerms = resolveEmployeeRBACPermissions(employee)
   const data = {
     company_id: employee.company_id || null,
     firebase_uid: firebaseUser.uid,
@@ -100,18 +101,33 @@ async function upsertProfessionalSaasUser(firebaseUser: User, employee: Employee
     phone: employee.phone || null,
     role: "professional" as const,
     professional_id: employee.id,
-    permissions: resolveEmployeeRBACPermissions(employee),
+    permissions: newPerms,
     is_active: employee.access_enabled !== false,
     updated_at: now,
   }
 
   if (existingUser?.id && !existingUser.id.startsWith("__")) {
-    try {
-      await updateDocument("saas_users", existingUser.id, data)
-    } catch (error) {
-      console.warn("Could not update SaaS user role locally:", error)
+    // Only write if data actually changed — saves Firestore quota
+    const needsUpdate =
+      existingUser.role !== data.role ||
+      existingUser.is_active !== data.is_active ||
+      existingUser.name !== data.name ||
+      existingUser.email !== data.email ||
+      existingUser.phone !== data.phone ||
+      existingUser.company_id !== data.company_id ||
+      (existingUser as SaaSUserWithProfessional).professional_id !== data.professional_id ||
+      JSON.stringify((existingUser as any).permissions || []) !== JSON.stringify(newPerms)
+
+    if (needsUpdate) {
+      try {
+        await updateDocument("saas_users", existingUser.id, data)
+      } catch (error) {
+        console.warn("Could not update SaaS user role locally:", error)
+      }
+      return { ...existingUser, ...data } as SaaSUser
     }
-    return { ...existingUser, ...data } as SaaSUser
+    // No changes — skip write entirely
+    return existingUser as SaaSUser
   }
 
   try {

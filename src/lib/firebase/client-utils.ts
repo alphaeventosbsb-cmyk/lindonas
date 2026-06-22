@@ -73,6 +73,17 @@ export async function fetchCollectionWithQueries<T>(
   }
 }
 
+const TIMEOUT_MS = 15000;
+
+function withTimeout<T>(promise: Promise<T>): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => 
+      setTimeout(() => reject(new Error("A operação excedeu o tempo limite. Verifique sua conexão com a internet ou se o limite de uso do banco de dados (Cota do Firebase) foi atingido.")), TIMEOUT_MS)
+    )
+  ]);
+}
+
 export async function createDocument(collectionName: string, data: any) {
   const bypass = data._bypass_conflict
   if (data._bypass_conflict !== undefined) {
@@ -108,28 +119,28 @@ export async function createDocument(collectionName: string, data: any) {
   }
 
   const colRef = collection(db(), collectionName)
-  const docRef = await addDoc(colRef, {
+  const docRef = await withTimeout(addDoc(colRef, {
     ...data,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
-  })
+  }))
   const newDoc = await getDoc(docRef)
   return { id: newDoc.id, ...newDoc.data() }
 }
 
 export async function updateDocument(collectionName: string, id: string, data: any) {
   const docRef = doc(db(), collectionName, id)
-  await updateDoc(docRef, { ...data, updated_at: new Date().toISOString() })
+  await withTimeout(updateDoc(docRef, { ...data, updated_at: new Date().toISOString() }))
   const updated = await getDoc(docRef)
   return { id: updated.id, ...updated.data() }
 }
 
 export async function setDocument(collectionName: string, id: string, data: any) {
   const docRef = doc(db(), collectionName, id)
-  await setDoc(docRef, { 
+  await withTimeout(setDoc(docRef, { 
     ...data, 
     updated_at: new Date().toISOString() 
-  }, { merge: true })
+  }, { merge: true }))
   const updated = await getDoc(docRef)
   return { id: updated.id, ...updated.data() }
 }

@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react"
+import { createContext, useCallback, useContext, useEffect, useState, useRef, type ReactNode } from "react"
 import { getAuthInstance } from "@/lib/firebase/config"
 import { onAuthStateChanged, type User } from "firebase/auth"
 import { createDocument, fetchCollectionWhere, getDocument, updateDocument } from "@/lib/firebase/client-utils"
@@ -379,11 +379,18 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     }
   }, [saasUser, user?.email])
 
+  const presenceRefs = useRef({ saasUserId: null as string | null | undefined, empId: null as string | null | undefined })
+
+  useEffect(() => {
+    presenceRefs.current = {
+      saasUserId: saasUser?.id,
+      empId: employee?.id || (saasUser as SaaSUserWithProfessional | null)?.professional_id
+    }
+  }, [saasUser, employee])
+
   useEffect(() => {
     // Heartbeat logic to keep the user "online"
     if (!user) return
-
-    const empIdToUpdate = employee?.id || (saasUser as SaaSUserWithProfessional | null)?.professional_id
 
     const updatePresence = async (online: boolean) => {
       try {
@@ -391,13 +398,16 @@ export function TenantProvider({ children }: { children: ReactNode }) {
           is_online: online,
           last_seen: new Date().toISOString()
         }
+        
+        const { saasUserId, empId } = presenceRefs.current
+
         // Update SaaS User
-        if (saasUser?.id && !saasUser.id.startsWith("__")) {
-          await updateDocument("saas_users", saasUser.id, payload)
+        if (saasUserId && !saasUserId.startsWith("__")) {
+          await updateDocument("saas_users", saasUserId, payload)
         }
         // Update Employee if linked
-        if (empIdToUpdate && !empIdToUpdate.startsWith("__")) {
-          await updateDocument("employees", empIdToUpdate, payload)
+        if (empId && !empId.startsWith("__")) {
+          await updateDocument("employees", empId, payload)
         }
       } catch (e) {
         console.warn("Could not update presence:", e)
@@ -407,10 +417,10 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     // Set online immediately
     updatePresence(true)
     
-    // Heartbeat every 30 seconds
+    // Heartbeat every 2 minutes to save quota (120 seconds)
     const intervalId = setInterval(() => {
       updatePresence(true)
-    }, 30 * 1000)
+    }, 120 * 1000)
 
     // Handle window close
     const handleBeforeUnload = () => {
@@ -424,7 +434,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       // When component unmounts (e.g. logout), set offline
       updatePresence(false)
     }
-  }, [saasUser, user, employee])
+  }, [user])
 
   const isSuperAdminUser = isSuperAdmin(user?.email)
   const companyId = saasUser?.company_id && saasUser.company_id !== "__master__" ? saasUser.company_id : null

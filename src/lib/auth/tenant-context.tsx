@@ -433,10 +433,10 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     // Set online immediately
     updatePresence(true)
     
-    // Heartbeat every 2 minutes to save quota (120 seconds)
+    // Heartbeat every 2 hours to save quota (7200 seconds)
     const intervalId = setInterval(() => {
       updatePresence(true)
-    }, 120 * 1000)
+    }, 7200 * 1000)
 
     // Handle window close
     const handleBeforeUnload = () => {

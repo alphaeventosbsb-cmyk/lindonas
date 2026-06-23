@@ -412,6 +412,7 @@ export interface Client {
   appointment_count: number
   last_visit: string | null
   online_booking_blocked?: boolean
+  first_visit_date?: string | null  // Data da primeira visita (editável, YYYY-MM-DD)
   created_at: string
   updated_at: string
 }

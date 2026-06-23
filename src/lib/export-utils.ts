@@ -312,6 +312,7 @@ export function mapImportColumns(row: Record<string, unknown>, moduleType: "clie
       else if (cleanK === 'telefone' || cleanK === 'celular' || cleanK === 'whatsapp' || cleanK === 'fone' || cleanK === 'contato' || cleanK === 'tel') mapping.phone = k
       else if (cleanK === 'email' || cleanK === 'e-mail' || cleanK === 'mail') mapping.email = k
       else if (cleanK === 'cpf' || cleanK === 'documento' || cleanK === 'doc') mapping.cpf = k
+      else if (cleanK === 'data da primeira visita' || cleanK === 'primeira visita' || cleanK === 'cliente desde') mapping.first_visit_date = k
     } else if (moduleType === "estoque") {
       if (cleanK === 'nome' || cleanK === 'produto' || cleanK === 'nome do produto' || cleanK === 'item' || cleanK === 'descrição' || cleanK === 'descricao') mapping.name = k
       else if (cleanK === 'categoria' || cleanK === 'grupo' || cleanK === 'tipo' || cleanK === 'marca') mapping.category = k

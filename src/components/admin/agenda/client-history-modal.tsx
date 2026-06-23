@@ -67,14 +67,25 @@ export function ClientHistoryModal({ client, onClose }: Props) {
   const firstVisit = validAttendances.length > 0 ? validAttendances[validAttendances.length - 1].appointment_date : null
 
   const MONTHS_SHORT = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez']
-  const fmtDate = (dateStr: string | null | undefined) => {
-    if (!dateStr) return null
+  const fmtDate = (dateVal: string | null | undefined | any) => {
+    if (!dateVal) return null
+    let dateStr: string
+    // Handle Firestore Timestamp
+    if (dateVal.toDate && typeof dateVal.toDate === 'function') {
+      const d = dateVal.toDate() as Date
+      return `${parseInt(String(d.getDate()))} ${MONTHS_SHORT[d.getMonth()]} ${d.getFullYear()}`
+    }
+    // Handle Date object
+    if (dateVal instanceof Date) {
+      return `${parseInt(String(dateVal.getDate()))} ${MONTHS_SHORT[dateVal.getMonth()]} ${dateVal.getFullYear()}`
+    }
+    dateStr = String(dateVal)
     const d = dateStr.split('T')[0]
     const parts = d.split('-')
     if (parts.length < 3) return d
     return `${parseInt(parts[2])} ${MONTHS_SHORT[parseInt(parts[1]) - 1]} ${parts[0]}`
   }
-  const clientSinceRaw = client.created_at || firstVisit
+  const clientSinceRaw = client.first_visit_date || client.created_at || firstVisit
   const clientSince = fmtDate(clientSinceRaw) || 'Não informado'
 
   return (

@@ -48,6 +48,7 @@ export function ClientFormModal({ client, onClose, onSave }: Props) {
   const [birthDate, setBirthDate] = useState("")
   const [gender, setGender] = useState<ClientGender | "">("")
   const [maritalStatus, setMaritalStatus] = useState<ClientMaritalStatus | "">("")
+  const [firstVisitDate, setFirstVisitDate] = useState("")
 
   // Contato
   const [phone, setPhone] = useState("")
@@ -73,9 +74,18 @@ export function ClientFormModal({ client, onClose, onSave }: Props) {
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
   const [photoUrl, setPhotoUrl] = useState<string | null>(null)
 
-  // Populate on edit
+  // Populate on edit, reset on new
   useEffect(() => {
-    if (!client) return
+    if (!client) {
+      // Reset all fields for new client
+      setName(""); setNickname(""); setCpf(""); setRg(""); setBirthDate("")
+      setGender(""); setMaritalStatus(""); setPhone(""); setWhatsapp("")
+      setIsWhatsapp(true); setEmail(""); setAddress({}); setNotes("")
+      setInstagram(""); setReferralSource(""); setReferredBy("")
+      setIsVip(false); setDebtAmount("0"); setPhotoUrl(null); setPhotoFile(null)
+      setPhotoPreview(null); setOnlineBookingBlocked(false); setFirstVisitDate("")
+      return
+    }
     setName(client.name || "")
     setNickname(client.nickname || "")
     setCpf(client.cpf ? formatCPF(client.cpf) : "")
@@ -96,11 +106,24 @@ export function ClientFormModal({ client, onClose, onSave }: Props) {
     setDebtAmount(String(client.debt_amount || 0))
     setPhotoUrl(client.photo_url || null)
     setOnlineBookingBlocked(client.online_booking_blocked || false)
+    setFirstVisitDate(client.first_visit_date || "")
   }, [client])
 
-  const formatDateLocale = (isoStr?: string | null) => {
+  const formatDateLocale = (isoStr?: string | null | any) => {
     if (!isoStr) return "Nenhuma"
     try {
+      // Handle Firestore Timestamp
+      if (isoStr.toDate && typeof isoStr.toDate === 'function') {
+        const d = isoStr.toDate() as Date
+        const months = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"]
+        return `${String(d.getDate()).padStart(2, '0')} ${months[d.getMonth()]} ${d.getFullYear()}`
+      }
+      // Handle Date object
+      if (isoStr instanceof Date) {
+        const months = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"]
+        return `${String(isoStr.getDate()).padStart(2, '0')} ${months[isoStr.getMonth()]} ${isoStr.getFullYear()}`
+      }
+      // Handle string (ISO or YYYY-MM-DD)
       const d = new Date(isoStr)
       if (isNaN(d.getTime())) return isoStr
       const months = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"]
@@ -181,6 +204,7 @@ export function ClientFormModal({ client, onClose, onSave }: Props) {
       debt_amount: debtVal,
       status: debtVal > 0 ? "debtor" : "active",
       online_booking_blocked: onlineBookingBlocked,
+      first_visit_date: firstVisitDate || null,
     }
 
     if (!client) {
@@ -282,7 +306,7 @@ export function ClientFormModal({ client, onClose, onSave }: Props) {
                     <div style={{ display: 'flex', borderTop: '1px solid #f1f3f9', paddingTop: '0.75rem', gap: '1rem' }}>
                       <div style={{ flex: 1, textAlign: 'center', borderRight: '1px solid #f1f3f9' }}>
                         <div style={{ fontSize: '0.6875rem', fontWeight: 700, color: '#6b7280', marginBottom: '0.25rem' }}>Cliente desde</div>
-                        <div style={{ fontSize: '0.8125rem', fontWeight: 800, color: '#1e1e2d' }}>{formatDateLocale(client.created_at)}</div>
+                        <div style={{ fontSize: '0.8125rem', fontWeight: 800, color: '#1e1e2d' }}>{formatDateLocale(client.first_visit_date || client.created_at)}</div>
                       </div>
                       <div style={{ flex: 1, textAlign: 'center' }}>
                         <div style={{ fontSize: '0.6875rem', fontWeight: 700, color: '#6b7280', marginBottom: '0.25rem' }}>Última visita</div>
@@ -348,6 +372,10 @@ export function ClientFormModal({ client, onClose, onSave }: Props) {
                   <div>
                     <label style={labelStyle}>Data de nascimento</label>
                     <input type="date" value={birthDate} onChange={e => setBirthDate(e.target.value)} style={inputStyle} />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Data da primeira visita</label>
+                    <input type="date" value={firstVisitDate} onChange={e => setFirstVisitDate(e.target.value)} style={inputStyle} title="Desde quando o cliente frequenta o estabelecimento" />
                   </div>
                   <div>
                     <label style={labelStyle}>Gênero</label>

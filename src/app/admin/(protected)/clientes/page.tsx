@@ -184,6 +184,7 @@ export default function ClientesPage() {
         const addressCol = Object.keys(columnMapping).find(k => columnMapping[k] === "address")
         const birthCol = Object.keys(columnMapping).find(k => columnMapping[k] === "birth_date")
         const notesCol = Object.keys(columnMapping).find(k => columnMapping[k] === "notes")
+        const firstVisitCol = Object.keys(columnMapping).find(k => columnMapping[k] === "first_visit_date")
 
         const name = row._generatedName ? String(row._generatedName) : (nameCol ? String(row[nameCol] || "").trim() : "")
         const phone = phoneCol ? String(row[phoneCol] || "").replace(/\D/g, "") : ""
@@ -218,7 +219,29 @@ export default function ClientesPage() {
           last_visit: null,
           is_vip: false,
           online_booking_blocked: false,
-          address: addressText ? { street: addressText } : null
+          address: addressText ? { street: addressText } : null,
+          first_visit_date: (() => {
+            if (!firstVisitCol) return null
+            const fvStr = String(row[firstVisitCol] || "").trim()
+            if (!fvStr) return null
+            // dd/mm/yyyy or dd-mm-yyyy
+            const brMatch = fvStr.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/)
+            if (brMatch) {
+              const [, dd, mm, yyyy] = brMatch
+              const d = parseInt(dd), m = parseInt(mm)
+              if (m >= 1 && m <= 12 && d >= 1 && d <= 31) {
+                return `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`
+              }
+              return null
+            }
+            // yyyy-mm-dd
+            const isoMatch = fvStr.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/)
+            if (isoMatch) {
+              const [, yyyy, mm, dd] = isoMatch
+              return `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`
+            }
+            return null
+          })()
         }
 
         await createDocument("clients", dataToSave)
@@ -306,7 +329,7 @@ export default function ClientesPage() {
         return sortedApts.length > 0 ? sortedApts[0].appointment_date.split('-').reverse().join('/') : '—';
       }
     },
-    { header: "Cliente Desde", key: "created_at", format: formatDateForExport }
+    { header: "Cliente Desde", key: "first_visit_date", format: (v, row) => formatDateForExport((v as string) || row.created_at) }
   ]
 
   return (

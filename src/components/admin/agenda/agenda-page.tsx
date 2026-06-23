@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useCallback, useMemo, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { fetchCollection, subscribeCollection, updateDocument, deleteDocument, createDocument, updateAppointment, deleteAppointment } from "@/lib/firebase/client-utils"
+import { fetchCollection, fetchCollectionWhere, subscribeCollection, updateDocument, deleteDocument, createDocument, updateAppointment, deleteAppointment } from "@/lib/firebase/client-utils"
+import { normalizeSearchText } from "@/lib/search"
 import { uploadToCloudinary } from "@/lib/cloudinary"
 import { ClientFormModal } from "@/components/admin/client-form-modal"
 import type { Appointment, Employee, AppointmentLabel, Service, Client, Category } from "@/lib/types/database"
@@ -36,6 +37,68 @@ import { AgendaCreditModal } from "./agenda-credit-modal"
 import { ProfessionalFormModal } from "@/components/admin/professional-form-modal"
 import { AddServiceModal } from "./add-service-modal"
 import { GlobalBlockModal } from "./global-block-modal"
+
+// Helper: busca cliente em lista local por telefone, email ou nome
+// Retorna { client, strongMatch } — strongMatch indica se encontrou por dado forte (telefone/email)
+function findClientInList(apt: Appointment, clients: Client[]): { client: Client; strongMatch: boolean } | null {
+  const aptPhone = (apt.client_phone || "").replace(/\D/g, "")
+  const aptEmail = (apt.client_email || "").trim().toLowerCase()
+  const aptNameNorm = normalizeSearchText(apt.client_name)
+
+  // 1) Busca forte: telefone ou email
+  if (aptPhone && aptPhone.length >= 8) {
+    const phoneMatches = clients.filter(c => {
+      const cPhone = (c.phone || "").replace(/\D/g, "")
+      const cWhatsapp = (c.whatsapp || "").replace(/\D/g, "")
+      return (cPhone && cPhone === aptPhone) || (cWhatsapp && cWhatsapp === aptPhone)
+    })
+    if (phoneMatches.length === 1) return { client: phoneMatches[0], strongMatch: true }
+  }
+  if (aptEmail) {
+    const emailMatches = clients.filter(c => c.email && c.email.trim().toLowerCase() === aptEmail)
+    if (emailMatches.length === 1) return { client: emailMatches[0], strongMatch: true }
+  }
+
+  // 2) Busca fraca: nome normalizado (somente se único)
+  if (aptNameNorm) {
+    const nameMatches = clients.filter(c => normalizeSearchText(c.name) === aptNameNorm)
+    if (nameMatches.length === 1) return { client: nameMatches[0], strongMatch: false }
+  }
+
+  return null
+}
+
+// Helper: busca direta no Firestore quando store.clients não tem o cliente
+async function findClientFromFirestore(apt: Appointment): Promise<{ client: Client; strongMatch: boolean } | null> {
+  const aptPhone = (apt.client_phone || "").replace(/\D/g, "")
+  const aptEmail = (apt.client_email || "").trim().toLowerCase()
+
+  try {
+    // Busca por telefone (dado forte)
+    if (aptPhone && aptPhone.length >= 8) {
+      const byPhone = await fetchCollectionWhere<Client>("clients", "phone", "==", aptPhone)
+      if (byPhone.length === 1) return { client: byPhone[0], strongMatch: true }
+    }
+
+    // Busca por email (dado forte)
+    if (aptEmail) {
+      const byEmail = await fetchCollectionWhere<Client>("clients", "email", "==", aptEmail)
+      if (byEmail.length === 1) return { client: byEmail[0], strongMatch: true }
+    }
+
+    // Busca por nome (dado fraco) — retorna como strongMatch=false
+    if (apt.client_name) {
+      const allClients = await fetchCollection<Client>("clients")
+      const aptNameNorm = normalizeSearchText(apt.client_name)
+      const nameMatches = allClients.filter(c => normalizeSearchText(c.name) === aptNameNorm)
+      if (nameMatches.length === 1) return { client: nameMatches[0], strongMatch: false }
+    }
+  } catch (err) {
+    console.error("Erro ao buscar cliente no Firestore:", err)
+  }
+
+  return null
+}
 
 export default function AgendaPage() {
   const store = useAgendaStore()
@@ -218,7 +281,7 @@ export default function AgendaPage() {
     }
   }
 
-  const handleAction = (action: string, apt: Appointment) => {
+  const handleAction = async (action: string, apt: Appointment) => {
     switch (action) {
       case "delete": handleDelete(apt.id); break
       case "close_account":
@@ -232,11 +295,29 @@ export default function AgendaPage() {
         store.setShowNewAppointment(true)
         break
       case "client": {
-        if (!apt.client_id) {
-          toast.error("Este agendamento não possui cliente vinculado.")
-          break
+        // 1) Busca primária pelo client_id no store
+        let clientObj = apt.client_id ? store.clients.find(c => c.id === apt.client_id) : null
+        let isStrong = false
+        // 2) Fallback: busca normalizada na lista local (store.clients)
+        if (!clientObj) {
+          const localResult = findClientInList(apt, store.clients)
+          if (localResult) {
+            clientObj = localResult.client
+            isStrong = localResult.strongMatch
+          }
         }
-        const clientObj = store.clients.find(c => c.id === apt.client_id)
+        // 3) Fallback: busca direta no Firestore (caso store não tenha todos os clientes)
+        if (!clientObj) {
+          const dbResult = await findClientFromFirestore(apt)
+          if (dbResult) {
+            clientObj = dbResult.client
+            isStrong = dbResult.strongMatch
+          }
+        }
+        // Auto-corrige client_id somente se match for forte (telefone/email)
+        if (clientObj && apt.id && clientObj.id !== apt.client_id && isStrong) {
+          updateDocument("appointments", apt.id, { client_id: clientObj.id }).catch(() => {})
+        }
         if (!clientObj) {
           toast.error("Cliente não encontrado na base de dados.")
           break
@@ -248,11 +329,19 @@ export default function AgendaPage() {
       case "add_credit":
       case "add_debit": {
         const type = action === "add_credit" ? "credit" : "debit"
-        if (!apt.client_id) {
-          toast.error("Cliente não vinculado. Registre-o primeiro.")
-          break
+        let client = apt.client_id ? store.clients.find(c => c.id === apt.client_id) : null
+        let isStrongCredit = false
+        if (!client) {
+          const localResult = findClientInList(apt, store.clients)
+          if (localResult) { client = localResult.client; isStrongCredit = localResult.strongMatch }
         }
-        const client = store.clients.find(c => c.id === apt.client_id)
+        if (!client) {
+          const dbResult = await findClientFromFirestore(apt)
+          if (dbResult) { client = dbResult.client; isStrongCredit = dbResult.strongMatch }
+        }
+        if (client && apt.id && client.id !== apt.client_id && isStrongCredit) {
+          updateDocument("appointments", apt.id, { client_id: client.id }).catch(() => {})
+        }
         if (client) {
           store.setSelectedAppointment(null)
           setTransactionModal({ client, type })

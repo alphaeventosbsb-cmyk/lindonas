@@ -220,7 +220,20 @@ export function AppointmentTooltip() {
                 const [y, m, d] = parts
                 return `${parseInt(d)} ${MONTHS_SHORT[parseInt(m) - 1]} ${y}`
               }
-              const clientSince = fmtShortDate(client.created_at?.split('T')[0]) || 'Não informado'
+              const safeToDateStr = (val: any): string | null => {
+                if (!val) return null
+                if (typeof val === 'string') return val.split('T')[0]
+                if (val.toDate && typeof val.toDate === 'function') {
+                  const d = val.toDate() as Date
+                  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+                }
+                if (val instanceof Date) {
+                  return `${val.getFullYear()}-${String(val.getMonth() + 1).padStart(2, '0')}-${String(val.getDate()).padStart(2, '0')}`
+                }
+                return null
+              }
+              const clientSinceDate = safeToDateStr(client.first_visit_date) || safeToDateStr(client.created_at)
+              const clientSince = fmtShortDate(clientSinceDate) || 'Não informado'
 
               // Calculate last visit from appointments
               const clientApts = store.appointments

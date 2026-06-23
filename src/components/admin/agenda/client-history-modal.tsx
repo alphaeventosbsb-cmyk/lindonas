@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react"
 import { X, Calendar, Clock, User, DollarSign, FileText, Loader2, AlertCircle } from "lucide-react"
 import { ExpandableImage } from "@/components/ui/expandable-image"
-import { fetchCollectionWhere } from "@/lib/firebase/client-utils"
+import { fetchCollectionWhere, getDocument } from "@/lib/firebase/client-utils"
 import type { Appointment, Client } from "@/lib/types/database"
 import { formatCurrency } from "@/lib/utils"
 import { statusCfg } from "./status-config"
@@ -12,10 +12,22 @@ interface Props {
   onClose: () => void
 }
 
-export function ClientHistoryModal({ client, onClose }: Props) {
+export function ClientHistoryModal({ client: clientProp, onClose }: Props) {
   const [history, setHistory] = useState<Appointment[]>([])
   const [loading, setLoading] = useState(true)
   const [imgError, setImgError] = useState(false)
+  const [client, setClient] = useState<Client>(clientProp)
+
+  // Se o client veio incompleto (sem created_at), busca o documento completo
+  useEffect(() => {
+    if (!clientProp.created_at && clientProp.id) {
+      getDocument<Client>("clients", clientProp.id).then(fullDoc => {
+        if (fullDoc) setClient(fullDoc)
+      }).catch(() => {})
+    } else {
+      setClient(clientProp)
+    }
+  }, [clientProp])
 
   useEffect(() => {
     async function load() {

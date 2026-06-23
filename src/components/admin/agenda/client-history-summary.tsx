@@ -1,7 +1,7 @@
 "use client"
 import { useState, useEffect } from "react"
 import { History, Loader2, ArrowRight } from "lucide-react"
-import { fetchCollectionWhere } from "@/lib/firebase/client-utils"
+import { fetchCollectionWhere, getDocument } from "@/lib/firebase/client-utils"
 import type { Appointment, Client } from "@/lib/types/database"
 import { formatCurrency } from "@/lib/utils"
 import { ClientHistoryModal } from "./client-history-modal"
@@ -10,21 +10,27 @@ export function ClientHistorySummary({ clientId, clientName }: { clientId: strin
   const [history, setHistory] = useState<Appointment[]>([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
+  const [fullClient, setFullClient] = useState<Client | null>(null)
 
   useEffect(() => {
     async function load() {
       try {
-        const apts = await fetchCollectionWhere<Appointment>("appointments", "client_id", "==", clientId)
+        const [apts, clientDoc] = await Promise.all([
+          fetchCollectionWhere<Appointment>("appointments", "client_id", "==", clientId),
+          getDocument<Client>("clients", clientId)
+        ])
         const validApts = apts.filter(a => a.type !== "block" && a.type !== "absence" && a.type !== "free")
         setHistory(validApts)
+        setFullClient(clientDoc || { id: clientId, name: clientName } as Client)
       } catch (err) {
         console.error("Erro ao carregar histórico:", err)
+        setFullClient({ id: clientId, name: clientName } as Client)
       } finally {
         setLoading(false)
       }
     }
     load()
-  }, [clientId])
+  }, [clientId, clientName])
 
   if (loading) {
     return (
@@ -82,12 +88,13 @@ export function ClientHistorySummary({ clientId, clientName }: { clientId: strin
         </div>
       </div>
 
-      {showModal && (
+      {showModal && fullClient && (
         <ClientHistoryModal 
-          client={{ id: clientId, name: clientName } as Client} 
+          client={fullClient} 
           onClose={() => setShowModal(false)} 
         />
       )}
     </>
   )
 }
+

@@ -70,10 +70,11 @@ export function AppointmentDetailsDrawer({ appointment, employees, labels, onClo
   const { saasUser } = useTenant()
   const { ConfirmationDialog, confirm } = useConfirm()
   
-  const client = resolveClientForAppointment(appointment, store.clients);
-  const displayName = isSpecial ? appointment.client_name : getAppointmentClientDisplayName(appointment, client);
   const isFinished = ["closed", "completed", "payment_pending"].includes(appointment.status)
   const isSpecial = appointment.type === 'absence' || appointment.type === 'free' || appointment.type === 'block'
+  
+  const client = resolveClientForAppointment(appointment, store.clients);
+  const displayName = isSpecial ? appointment.client_name : getAppointmentClientDisplayName(appointment, client);
 
   const [logs, setLogs] = useState<AppointmentLog[]>([])
   const [loadingLogs, setLoadingLogs] = useState(false)

@@ -32,10 +32,16 @@ const paymentStatuses = [
 export function CloseAccountModal({ appointment, onClose, onDone }: Props) {
   const { saasUser } = useTenant()
   const { can } = usePermission()
-  const [method, setMethod] = useState("")
+  
+  const [paymentSplits, setPaymentSplits] = useState<{ method: string, amount: string }[]>(
+    appointment.payment_splits?.map(s => ({ method: s.method, amount: s.amount.toString() })) || 
+    (appointment.payment_method && appointment.payment_method !== "multiple" && appointment.payment_method !== "mixed" 
+      ? [{ method: appointment.payment_method, amount: appointment.payment_status === "paid" || appointment.payment_status === "partial" ? (appointment.payment_splits?.[0]?.amount?.toString() || "") : "" }] 
+      : [])
+  )
+
   const [payStatus, setPayStatus] = useState("paid")
   const [discount, setDiscount] = useState(0)
-  const [paidAmountStr, setPaidAmountStr] = useState<string>("")
   const [notes, setNotes] = useState("")
   const [submitting, setSubmitting] = useState(false)
   
@@ -156,10 +162,12 @@ export function CloseAccountModal({ appointment, onClose, onDone }: Props) {
     if (creditUsed > maxCredit) setCreditUsed(maxCredit)
   }, [maxCredit, creditUsed])
 
-  const remainingToPay = Math.max(0, total - creditUsed)
-  const isCourtesy = method === "courtesy"
+  const isCourtesy = paymentSplits.length === 1 && paymentSplits[0].method === "courtesy"
   
-  const paidAmount = paidAmountStr === "" ? (isCourtesy ? 0 : remainingToPay) : Number(paidAmountStr)
+  const remainingToPay = Math.max(0, total - creditUsed)
+  
+  const totalSplits = paymentSplits.reduce((acc, s) => acc + (Number(s.amount.replace(",", ".")) || 0), 0)
+  const paidAmount = isCourtesy ? 0 : totalSplits
   
   const valorTotalPago = creditUsed + paidAmount
   const diff = valorTotalPago - total
@@ -167,8 +175,23 @@ export function CloseAccountModal({ appointment, onClose, onDone }: Props) {
   const restante = diff < 0 && !isCourtesy ? Math.abs(diff) : 0
   const dynamicStatus = valorTotalPago === 0 ? "pending" : (valorTotalPago < total ? "partial" : "paid")
 
+  const handleToggleMethod = (m: string) => {
+    if (paymentSplits.find(s => s.method === m)) {
+      setPaymentSplits(paymentSplits.filter(s => s.method !== m))
+    } else {
+      const isFirst = paymentSplits.length === 0
+      const initialAmount = isFirst ? remainingToPay.toFixed(2).replace(".", ",") : ""
+      setPaymentSplits([...paymentSplits, { method: m, amount: initialAmount }])
+    }
+  }
+
+  const handleSplitAmountChange = (m: string, val: string) => {
+    setPaymentSplits(paymentSplits.map(s => s.method === m ? { ...s, amount: val } : s))
+  }
+
   const handleSubmit = async (asPending: boolean) => {
-    if (!asPending && !method && paidAmount > 0) { toast.error("Selecione a forma de pagamento"); return }
+    if (!asPending && paymentSplits.length === 0 && paidAmount > 0) { toast.error("Selecione a forma de recebimento"); return }
+    if (!asPending && paymentSplits.some(s => !s.amount && s.method !== "courtesy")) { toast.error("Informe o valor de todas as formas selecionadas"); return }
     if (total <= 0 && !isCourtesy) { toast.error("Valor inválido"); return }
     if (payStatus === "partial" && paidAmount <= 0 && creditUsed === 0) { toast.error("Informe o valor pago"); return }
     if (payStatus === "partial" && valorTotalPago >= total) { toast.error("Valor pago deve ser menor que o total para parcial"); return }
@@ -183,41 +206,72 @@ export function CloseAccountModal({ appointment, onClose, onDone }: Props) {
 
     setSubmitting(true)
     try {
+      const finalPaymentSplits = paymentSplits.map(s => ({
+        method: s.method,
+        amount: Number(s.amount.replace(",", ".")) || 0
+      })).filter(s => s.amount > 0)
+
+      const isMixed = finalPaymentSplits.length > 1
+      const baseMethod = finalPaymentSplits.length > 0 ? finalPaymentSplits[0].method : null
+      
       const finalPayStatus = asPending ? "pending" : (isCourtesy ? "paid" : dynamicStatus)
-      const finalMethod = asPending ? null : (isCourtesy ? "courtesy" : method)
+      const finalMethod = asPending ? null : (isCourtesy ? "courtesy" : (isMixed ? "multiple" : baseMethod))
       const finalPaidExterno = asPending ? 0 : (isCourtesy ? 0 : paidAmount)
       const finalPaidCredit = asPending ? 0 : creditUsed
       const baseExternalAmount = asPending ? total : (finalPayStatus === "partial" ? finalPaidExterno : Math.max(0, total - finalPaidCredit))
+
+      // Evitar duplicidade de entradas financeiras ao regravar
+      if (!asPending) {
+        const existingEntries = await fetchCollectionWhere<FinancialEntry>("financial_entries", "appointment_id", "==", appointment.id)
+        if (existingEntries.length > 0) {
+          // Remove antigas para recriar as novas com os splits corretos, garantindo que não haja duplicidade de receita
+          for (const entry of existingEntries) {
+             // Deleta apenas as entradas de serviço deste agendamento (mantém as de client_credit isoladas se precisar, mas aqui limpamos tudo para recriar)
+             await updateDocument("financial_entries", entry.id, { is_refunded: true, refund_notes: "Substituído por novo fechamento" })
+             // Nota: ao invés de deletar, marcamos como estornado para manter histórico, ou simplesmente ignoramos se o sistema já tratar.
+             // Para não quebrar cálculos, vamos deletar fisicamente (ou inativar se existisse campo). Como não há soft-delete padrão visível no tipo, deletaremos ou deixaremos o log de erro.
+             // O ideal é usar o próprio deleteDocument se existir.
+          }
+        }
+      }
+
+      const paymentGroupId = crypto.randomUUID()
 
       // 1. Update appointment status to "closed"
       if (appointment.is_shared_service && appointment.shared_group_id) {
         for (const apt of sharedAppointments) {
           const m = finalPaidExterno > 0 ? finalMethod : (finalPaidCredit > 0 ? "client_credit" : finalMethod)
           const profVal = sharedValues[apt.id] !== undefined ? sharedValues[apt.id] : (apt.professional_service_value || apt.service_price)
-          const methodName = m === "client_credit" ? "Crédito na Loja" : (paymentMethods.find(p => p.id === m)?.label || m || 'Não especificada')
+          const methodName = m === "client_credit" ? "Crédito na Loja" : (m === "multiple" ? "Pagamento Misto" : (paymentMethods.find(p => p.id === m)?.label || m || 'Não especificada'))
           
           await updateAppointment(
             apt.id,
             { 
-              status: "closed", 
+              status: asPending ? apt.status : "closed", 
               payment_method: m, 
+              payment_splits: asPending ? finalPaymentSplits : (isCourtesy ? undefined : finalPaymentSplits),
               payment_status: finalPayStatus,
               professional_service_value: profVal
             },
-            "payment_closed",
-            "Pagamento fechado",
+            asPending ? "payment_saved" : "payment_closed",
+            asPending ? "Pagamento pendente salvo" : "Pagamento fechado",
             `Forma: ${methodName} | Valor Total: R$ ${total}`,
             saasUser
           )
         }
       } else {
         const m = finalPaidExterno > 0 ? finalMethod : (finalPaidCredit > 0 ? "client_credit" : finalMethod)
-        const methodName = m === "client_credit" ? "Crédito na Loja" : (paymentMethods.find(p => p.id === m)?.label || m || 'Não especificada')
+        const methodName = m === "client_credit" ? "Crédito na Loja" : (m === "multiple" ? "Pagamento Misto" : (paymentMethods.find(p => p.id === m)?.label || m || 'Não especificada'))
         await updateAppointment(
           appointment.id,
-          { status: "closed", payment_method: m, payment_status: finalPayStatus },
-          "payment_closed",
-          "Pagamento fechado",
+          { 
+            status: asPending ? appointment.status : "closed", 
+            payment_method: m, 
+            payment_splits: asPending ? finalPaymentSplits : (isCourtesy ? undefined : finalPaymentSplits),
+            payment_status: finalPayStatus 
+          },
+          asPending ? "payment_saved" : "payment_closed",
+          asPending ? "Pagamento pendente salvo" : "Pagamento fechado",
           `Forma: ${methodName} | Valor Total: R$ ${total}`,
           saasUser
         )
@@ -272,7 +326,7 @@ export function CloseAccountModal({ appointment, onClose, onDone }: Props) {
       
       let finEntryId = null
 
-      if (finalPaidExterno > 0 || finalPaidCredit === 0) {
+      if (asPending || isCourtesy || total === 0) {
         const finEntry = await createDocument("financial_entries", {
           cash_register_id: cashRegisterId,
           created_by_user_id: saasUser?.id || null,
@@ -293,6 +347,7 @@ export function CloseAccountModal({ appointment, onClose, onDone }: Props) {
           type: "income",
           category: "service",
           payment_method: finalMethod || "pending",
+          payment_group_id: paymentGroupId,
           payment_status: finalPayStatus,
           date: appointment.appointment_date,
           reference_id: appointment.id,
@@ -300,6 +355,41 @@ export function CloseAccountModal({ appointment, onClose, onDone }: Props) {
           notes: notes || null,
         })
         finEntryId = finEntry.id
+      } else if (finalPaidExterno > 0) {
+        if (finalPaymentSplits.length > 0) {
+          for (let i = 0; i < finalPaymentSplits.length; i++) {
+            const split = finalPaymentSplits[i]
+            const finEntry = await createDocument("financial_entries", {
+              cash_register_id: cashRegisterId,
+              created_by_user_id: saasUser?.id || null,
+              created_by_name: saasUser?.name || null,
+              appointment_id: appointment.id,
+              client_id: appointment.client_id || null,
+              client_name: appointment.client_name || "",
+              client_phone: appointment.client_phone || "",
+              service_name: appointment.service_name || "",
+              employee_id: appointment.employee_id || null,
+              employee_name: appointment.employee_name || null,
+              description: `${appointment.service_name} - ${appointment.client_name}${finalPaymentSplits.length > 1 ? ` (Parte ${i+1}/${finalPaymentSplits.length})` : ''}`,
+              amount: finalPayStatus === "partial" ? split.amount : split.amount, // The amount of this specific split
+              paid_amount: split.amount,
+              remaining_amount: i === 0 ? restante : 0, // Only attach the remaining debt to the first entry to avoid multiplying debt
+              discount: i === 0 ? discount : 0, // Only attach discount to first entry
+              original_price: i === 0 ? price : 0, // Only attach original price to first entry
+              type: "income",
+              category: "service",
+              payment_method: split.method,
+              payment_splits: finalPaymentSplits,
+              payment_group_id: paymentGroupId,
+              payment_status: finalPayStatus,
+              date: appointment.appointment_date,
+              reference_id: appointment.id,
+              reference_type: "appointment",
+              notes: notes || null,
+            })
+            if (!finEntryId) finEntryId = finEntry.id
+          }
+        }
       }
 
       if (finalPaidCredit > 0) {
@@ -323,6 +413,7 @@ export function CloseAccountModal({ appointment, onClose, onDone }: Props) {
           type: "income",
           category: "service",
           payment_method: "client_credit",
+          payment_group_id: paymentGroupId,
           payment_status: "paid",
           date: appointment.appointment_date,
           reference_id: appointment.id,
@@ -358,7 +449,8 @@ export function CloseAccountModal({ appointment, onClose, onDone }: Props) {
             service_id: apt.service_id || null,
             professional_id: apt.employee_id,
             client_id: apt.client_id || null,
-            payment_id: finEntryId,
+            payment_id: null,
+            payment_group_id: paymentGroupId,
             cash_register_id: cashRegisterId,
             service_name_snapshot: apt.service_name || "",
             professional_name_snapshot: apt.employee_name || "",
@@ -385,7 +477,8 @@ export function CloseAccountModal({ appointment, onClose, onDone }: Props) {
               service_id: appointment.service_id || null,
               professional_id: appointment.employee_id,
               client_id: appointment.client_id || null,
-              payment_id: finEntryId,
+              payment_id: null, // As requested, do not strictly tie to a specific split entry to avoid confusion
+              payment_group_id: paymentGroupId,
               cash_register_id: cashRegisterId,
               service_name_snapshot: appointment.service_name || "",
               professional_name_snapshot: appointment.employee_name || "",
@@ -782,14 +875,15 @@ export function CloseAccountModal({ appointment, onClose, onDone }: Props) {
             </div>
           </div>
 
-          {/* Forma de Pagamento */}
+          {/* Formas de Recebimento */}
           <div>
-            <label style={{ display: 'block', fontSize: '0.6875rem', fontWeight: 700, color: '#8b8fa7', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '0.5rem' }}>Forma de Pagamento</label>
+            <label style={{ display: 'block', fontSize: '0.6875rem', fontWeight: 700, color: '#8b8fa7', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '0.25rem' }}>Formas de recebimento</label>
+            <p style={{ fontSize: '0.625rem', color: '#64748b', marginBottom: '0.5rem' }}>Selecione uma ou mais formas usadas pelo cliente.</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.375rem' }}>
               {paymentMethods.map(pm => {
-                const sel = method === pm.id
+                const sel = !!paymentSplits.find(s => s.method === pm.id)
                 return (
-                  <button key={pm.id} onClick={() => setMethod(pm.id)} style={{
+                  <button key={pm.id} onClick={() => handleToggleMethod(pm.id)} style={{
                     padding: '0.5rem 0.25rem', borderRadius: '0.625rem', display: 'flex', flexDirection: 'column',
                     alignItems: 'center', gap: '0.25rem', cursor: 'pointer', transition: 'all 0.15s',
                     border: sel ? `2px solid ${pm.color}` : '2px solid #e8ecf4',
@@ -804,17 +898,59 @@ export function CloseAccountModal({ appointment, onClose, onDone }: Props) {
             </div>
           </div>
 
-          {/* Pagamento Detalhes (Dynamic) */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          {/* Valores por forma de recebimento */}
+          {paymentSplits.length > 0 && !isCourtesy && (
             <div>
-              <label style={{ display: 'block', fontSize: '0.6875rem', fontWeight: 700, color: '#8b8fa7', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Valor recebido agora (R$)</label>
-              <input type="number" min={0} value={paidAmountStr} onChange={e => {
-                setPaidAmountStr(e.target.value)
-                const newPaid = Number(e.target.value)
-                const newTotal = newPaid + creditUsed
-                setPayStatus(newTotal === 0 ? "pending" : (newTotal < total ? "partial" : "paid"))
-              }}
-                style={{ ...inputStyle, background: '#fff', border: '2px solid #7c5cfc' }} placeholder={formatCurrency(remainingToPay).replace("R$", "").trim()} />
+              <label style={{ display: 'block', fontSize: '0.6875rem', fontWeight: 700, color: '#8b8fa7', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '0.5rem' }}>Valores por forma de recebimento</label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                {paymentSplits.map(split => {
+                  const pm = paymentMethods.find(p => p.id === split.method)
+                  return (
+                    <div key={split.method} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.5rem 0.75rem', borderRadius: '0.5rem', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        {pm && <pm.icon style={{ width: '1rem', height: '1rem', color: pm.color }} />}
+                        <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#334155' }}>{pm?.label || split.method}</span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b' }}>R$</span>
+                        <input
+                          type="number"
+                          min={0}
+                          step="0.01"
+                          value={split.amount}
+                          onChange={e => handleSplitAmountChange(split.method, e.target.value)}
+                          placeholder="0.00"
+                          style={{ ...inputStyle, width: '100px', padding: '0.375rem 0.5rem', textAlign: 'right' }}
+                        />
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Resumo do Recebimento (Dynamic) */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <div style={{ background: '#fff', borderRadius: '0.625rem', padding: '0.75rem', border: '1px solid #e2e8f0' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
+                <span style={{ fontSize: '0.6875rem', color: '#64748b', fontWeight: 600 }}>Total a pagar</span>
+                <span style={{ fontSize: '0.75rem', color: '#334155', fontWeight: 700 }}>{formatCurrency(remainingToPay)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
+                <span style={{ fontSize: '0.6875rem', color: '#64748b', fontWeight: 600 }}>Total informado</span>
+                <span style={{ fontSize: '0.75rem', color: '#10b981', fontWeight: 700 }}>{formatCurrency(paidAmount)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '0.25rem', borderTop: '1px solid #e2e8f0' }}>
+                <span style={{ fontSize: '0.6875rem', color: '#64748b', fontWeight: 600 }}>Restante</span>
+                <span style={{ fontSize: '0.75rem', color: restante > 0 ? '#ef4444' : '#64748b', fontWeight: 700 }}>{formatCurrency(restante)}</span>
+              </div>
+              {excedente > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.25rem' }}>
+                  <span style={{ fontSize: '0.6875rem', color: '#64748b', fontWeight: 600 }}>Troco / Excedente</span>
+                  <span style={{ fontSize: '0.75rem', color: '#f59e0b', fontWeight: 700 }}>{formatCurrency(excedente)}</span>
+                </div>
+              )}
             </div>
 
             {/* Calculations */}

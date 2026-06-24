@@ -325,6 +325,11 @@ export interface AppointmentLog {
   created_at: string
 }
 
+export interface PaymentSplit {
+  method: string
+  amount: number
+}
+
 export interface Appointment {
   id: string
   company_id: string
@@ -343,6 +348,7 @@ export interface Appointment {
   duration_minutes: number
   status: AppointmentStatus
   payment_method: PaymentMethod | null
+  payment_splits?: PaymentSplit[]
   payment_status: PaymentStatus
   notes: string | null
   priority_color: string | null
@@ -428,6 +434,8 @@ export interface FinancialEntry {
   description: string
   amount: number
   payment_method: PaymentMethod
+  payment_splits?: PaymentSplit[]
+  payment_group_id?: string | null
   reference_id: string | null
   reference_type: string | null
   date: string
@@ -643,7 +651,7 @@ export interface Notification {
 // ===================== ENUMS =====================
 
 export type AppointmentStatus = "pending" | "confirmed" | "waiting" | "in_progress" | "completed" | "payment_pending" | "closed" | "cancelled" | "no_show"
-export type PaymentMethod = "cash" | "pix" | "credit_card" | "debit_card"
+export type PaymentMethod = "cash" | "pix" | "credit_card" | "debit_card" | "transfer" | "courtesy" | "other" | "client_credit" | "multiple" | string
 export type PaymentStatus = "pending" | "paid" | "partial" | "refunded"
 export type ClientStatus = "active" | "debtor" | "inactive"
 export type Role = "master_admin" | "business_owner" | "manager" | "professional" | "client"

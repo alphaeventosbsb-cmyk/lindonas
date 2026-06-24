@@ -289,15 +289,10 @@ export function calculateSharedServiceSplits(sharedAppointments: Appointment[]):
 
   serviceGroups.forEach((apts, key) => {
     const count = apts.length
+    const explicitTotal = apts.find(a => a.service_total_value != null)?.service_total_value
     const maxServicePrice = Math.max(...apts.map(a => a.service_price || 0))
-    const sumServicePrice = apts.reduce((acc, a) => acc + (a.service_price || 0), 0)
 
-    let baseValue = maxServicePrice
-    if (count > 1) {
-      if (sumServicePrice > maxServicePrice && Math.abs(maxServicePrice - (sumServicePrice / count)) < 0.01) {
-        baseValue = sumServicePrice
-      }
-    }
+    const baseValue = explicitTotal != null ? explicitTotal : maxServicePrice
 
     if (count === 1) {
       const apt = apts[0]

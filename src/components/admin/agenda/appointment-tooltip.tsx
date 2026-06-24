@@ -90,7 +90,7 @@ export function AppointmentTooltip() {
           onMouseLeave={() => setIsHoveringTooltip(false)}
           style={{
             width: 320,
-            zIndex: 9990,
+            zIndex: 99999,
             background: '#fff',
             borderRadius: '1rem',
             boxShadow: '0 20px 60px rgba(0,0,0,0.15), 0 4px 16px rgba(0,0,0,0.08)',

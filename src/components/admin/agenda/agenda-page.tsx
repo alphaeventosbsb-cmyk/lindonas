@@ -375,6 +375,20 @@ export default function AgendaPage() {
         store.setPrefillAppointment(apt)
         store.setShowNewAppointment(true)
         break
+      case "new_at_same_time":
+        store.setSelectedAppointment(null)
+        store.setPrefillAppointment({
+          ...apt,
+          client_id: '',
+          client_name: '',
+          client_phone: '',
+          service_id: '',
+          service_name: '',
+          notes: ''
+        })
+        store.setEditMode(false)
+        store.setShowNewAppointment(true)
+        break
       case "add_service":
         store.setSelectedAppointment(null)
         setAddServiceAppointment(apt)

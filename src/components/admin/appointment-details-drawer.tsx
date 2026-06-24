@@ -922,6 +922,12 @@ export function AppointmentDetailsDrawer({ appointment, employees, labels, onClo
                   }}>
                     Faltou
                   </button>
+                  <button onClick={() => { onClose(); onAction("new_at_same_time", appointment) }} style={{
+                    padding: '0.5rem 0.625rem', borderRadius: '0.5rem', border: 'none',
+                    fontSize: '0.6875rem', fontWeight: 600, cursor: 'pointer', background: '#e0e7ff', color: '#4f46e5',
+                  }}>
+                    + Novo Agendamento
+                  </button>
                   <button onClick={() => { onClose(); onAction("add_service", appointment) }} style={{
                     padding: '0.5rem 0.625rem', borderRadius: '0.5rem', border: '1px solid #e8ecf4',
                     fontSize: '0.6875rem', fontWeight: 700, cursor: 'pointer', background: '#fff', color: '#7c5cfc',

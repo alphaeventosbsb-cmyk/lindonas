@@ -15,6 +15,7 @@ import { usePermission } from "@/lib/rbac/usePermission"
 const menuSections = [
   {
     items: [
+      { id: "new_at_same_time", label: "+ Novo Agendamento", icon: CalendarPlus, color: "#4f46e5" },
       { id: "edit", label: "Ver / Editar Agendamento", icon: Edit3 },
       { id: "client", label: "Editar Cliente", icon: User },
       { id: "status", label: "Alterar Status", icon: RefreshCw, hasSubmenu: true },

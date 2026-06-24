@@ -4,8 +4,9 @@ import { useState, useEffect, useMemo } from "react"
 import { X, CheckCircle, Loader2, Banknote, Calendar, CreditCard, DollarSign, Wallet, AlertTriangle } from "lucide-react"
 import type { Employee, Commission, CashRegister } from "@/lib/types/database"
 import { formatCurrency, toLocalDateStr } from "@/lib/utils"
-import { fetchCollectionWhere, updateDocument, createDocument } from "@/lib/firebase/client-utils"
+import { fetchCollectionWhere, fetchCollectionWithQueries, updateDocument, createDocument } from "@/lib/firebase/client-utils"
 import { toast } from "sonner"
+import { useTenant } from "@/lib/auth/tenant-context"
 
 type ModalType = "services" | "revenue" | "payment" | null
 
@@ -361,6 +362,7 @@ function RevenueModalContent({ commissions, defaultStart, defaultEnd }: { commis
 // 3. PAYMENT MODAL CONTENT
 // ============================================================================
 function PaymentModalContent({ employee, commissions, start, end, onRefresh }: { employee: Employee, commissions: Commission[], start: string, end: string, onRefresh: () => void }) {
+  const { saasUser } = useTenant()
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [isProcessing, setIsProcessing] = useState(false)
   
@@ -386,9 +388,14 @@ function PaymentModalContent({ employee, commissions, start, end, onRefresh }: {
   useEffect(() => {
     // Check cash register
     const today = toLocalDateStr()
-    fetchCollectionWhere<CashRegister>("cash_registers", "date", "==", today)
-      .then(res => setHasOpenRegister(res.length > 0 && res[0].status === "open"))
-  }, [])
+    if (saasUser?.id) {
+      fetchCollectionWithQueries<CashRegister>("cash_registers", [
+        { field: "company_id", operator: "==", value: saasUser.id },
+        { field: "date", operator: "==", value: today }
+      ])
+        .then(res => setHasOpenRegister(res.length > 0 && res[0].status === "open"))
+    }
+  }, [saasUser?.id])
 
   const toggleSelect = (id: string) => {
     const next = new Set(selectedIds)
@@ -406,12 +413,15 @@ function PaymentModalContent({ employee, commissions, start, end, onRefresh }: {
     try {
       setIsProcessing(true)
       await createDocument("cash_registers", {
+        company_id: saasUser?.id || null,
         date: toLocalDateStr(),
         opening_amount: parseFloat(openingAmount),
         closing_amount: null,
         expected_amount: null,
         difference: null,
         status: "open",
+        opened_by_user_id: saasUser?.id || null,
+        opened_by_name: saasUser?.name || null,
         notes: "Aberto para pagamento de comissão",
         opened_at: new Date().toISOString(),
         closed_at: null,
@@ -433,7 +443,10 @@ function PaymentModalContent({ employee, commissions, start, end, onRefresh }: {
 
     setIsProcessing(true)
     try {
-      const activeRegisters = await fetchCollectionWhere<CashRegister>("cash_registers", "date", "==", toLocalDateStr())
+      const activeRegisters = await fetchCollectionWithQueries<CashRegister>("cash_registers", [
+        { field: "company_id", operator: "==", value: saasUser?.id },
+        { field: "date", operator: "==", value: toLocalDateStr() }
+      ])
       const activeRegister = activeRegisters.find(r => r.status === "open")
       
       if (!activeRegister) {

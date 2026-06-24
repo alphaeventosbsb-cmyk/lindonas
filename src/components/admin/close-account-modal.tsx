@@ -62,11 +62,19 @@ export function CloseAccountModal({ appointment, onClose, onDone }: Props) {
 
   useEffect(() => {
     const today = toLocalDateStr()
-    fetchCollectionWhere<CashRegister>("cash_registers", "date", "==", today)
-      .then(res => {
-        setHasOpenRegister(res.length > 0 && res[0].status === "open")
-      })
-      .finally(() => setLoadingRegister(false))
+    if (saasUser?.id) {
+      fetchCollectionWithQueries<CashRegister>("cash_registers", [
+        { field: "company_id", operator: "==", value: saasUser.id },
+        { field: "date", operator: "==", value: today }
+      ])
+        .then(res => {
+          setHasOpenRegister(res.length > 0 && res[0].status === "open")
+        })
+        .finally(() => setLoadingRegister(false))
+    } else {
+      setHasOpenRegister(false)
+      setLoadingRegister(false)
+    }
 
     fetchCollection<Employee>("employees").then(res => setEmployeesData(res))
 
@@ -196,7 +204,10 @@ export function CloseAccountModal({ appointment, onClose, onDone }: Props) {
     if (payStatus === "partial" && paidAmount <= 0 && creditUsed === 0) { toast.error("Informe o valor pago"); return }
     if (payStatus === "partial" && valorTotalPago >= total) { toast.error("Valor pago deve ser menor que o total para parcial"); return }
 
-    const activeCashRegister = await fetchCollectionWhere<CashRegister>("cash_registers", "date", "==", toLocalDateStr())
+    const activeCashRegister = await fetchCollectionWithQueries<CashRegister>("cash_registers", [
+      { field: "company_id", operator: "==", value: saasUser?.id },
+      { field: "date", operator: "==", value: toLocalDateStr() }
+    ])
     const openCashRegister = activeCashRegister.find(r => r.status === "open")
     const cashRegisterId = openCashRegister ? openCashRegister.id : null
 
@@ -654,6 +665,7 @@ export function CloseAccountModal({ appointment, onClose, onDone }: Props) {
     try {
       setLoadingRegister(true)
       await createDocument("cash_registers", {
+        company_id: saasUser?.id || null,
         date: toLocalDateStr(),
         opening_amount: parseFloat(openingAmount),
         closing_amount: null,
@@ -661,6 +673,7 @@ export function CloseAccountModal({ appointment, onClose, onDone }: Props) {
         difference: null,
         status: "open",
         opened_by_user_id: saasUser?.id || null,
+        opened_by_name: saasUser?.name || null,
         notes: "Aberto via fechamento de pagamento",
         opened_at: new Date().toISOString(),
         closed_at: null,

@@ -62,6 +62,15 @@ export function AppointmentCard({ appointment, top, height, leftPercent, widthPe
 
   const isCompact = height < 55
 
+  const isHovered = store.hoveredAppointment?.id === appointment.id
+  const isOverlapped = leftPercent !== undefined && widthPercent !== undefined && widthPercent < 1
+
+  const baseLeft = leftPercent !== undefined ? `calc(${leftPercent * 100}% + 4px)` : '4px'
+  const baseWidth = widthPercent !== undefined ? `calc(${widthPercent * 100}% - 8px)` : 'calc(100% - 8px)'
+
+  const activeLeft = isHovered && isOverlapped ? '4px' : baseLeft
+  const activeWidth = isHovered && isOverlapped ? 'calc(100% - 8px)' : baseWidth
+
   return (
     <motion.div
       ref={setNodeRef}
@@ -77,20 +86,19 @@ export function AppointmentCard({ appointment, top, height, leftPercent, widthPe
       style={{
         position: 'absolute',
         top: `${top}px`,
-        left: leftPercent !== undefined ? `calc(${leftPercent * 100}% + 4px)` : '4px',
-        width: widthPercent !== undefined ? `calc(${widthPercent * 100}% - 8px)` : 'calc(100% - 8px)',
+        left: activeLeft,
+        width: activeWidth,
         height: `${height - 2}px`,
         borderRadius: '0.5rem',
-        overflow: 'hidden',
+        overflow: isHovered ? 'visible' : 'hidden',
         cursor: 'pointer',
-        zIndex: isDragging ? 50 : (store.hoveredAppointment?.id === appointment.id ? 60 : 3),
-        transition: 'box-shadow 0.15s, transform 0.1s, opacity 0.25s, z-index 0.15s',
+        zIndex: isDragging ? 50 : (isHovered ? 60 : 3),
+        transition: 'all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1)',
         background: isCut ? `${bg}88` : bg,
         border: isCut ? `2px dashed ${dot}88` : `${borderWidth} ${borderStyle} ${border}`,
-        boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+        boxShadow: isHovered ? `0 12px 30px rgba(0,0,0,0.18), 0 0 0 1px ${dot}40` : '0 1px 4px rgba(0,0,0,0.06)',
       }}
       whileHover={{
-        boxShadow: `0 4px 16px rgba(0,0,0,0.1), 0 0 0 1px ${dot}40`,
         scale: 1.02,
         zIndex: 60,
       }}

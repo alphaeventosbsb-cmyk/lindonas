@@ -3,7 +3,7 @@ import { useState, useEffect } from "react"
 import type { Appointment, Client } from "@/lib/types/database"
 import { formatCurrency, formatPhone, toLocalDateStr } from "@/lib/utils"
 import { X, DollarSign, CreditCard, Smartphone, Banknote, ArrowRightLeft, Gift, HelpCircle, User, Scissors, Calendar, Clock, CheckCircle, Loader2, Users } from "lucide-react"
-import { updateAppointment, createDocument, fetchCollectionWhere, updateDocument, fetchCollection, getDocument } from "@/lib/firebase/client-utils"
+import { updateAppointment, createDocument, fetchCollectionWhere, updateDocument, fetchCollection, getDocument, fetchCollectionWithQueries } from "@/lib/firebase/client-utils"
 import type { CashRegister, Employee, Commission, Product, ServiceProduct, InventoryMovement } from "@/lib/types/database"
 import { useTenant } from "@/lib/auth/tenant-context"
 import { toast } from "sonner"
@@ -204,19 +204,24 @@ export function CloseAccountModal({ appointment, onClose, onDone }: Props) {
     if (payStatus === "partial" && paidAmount <= 0 && creditUsed === 0) { toast.error("Informe o valor pago"); return }
     if (payStatus === "partial" && valorTotalPago >= total) { toast.error("Valor pago deve ser menor que o total para parcial"); return }
 
-    const activeCashRegister = await fetchCollectionWithQueries<CashRegister>("cash_registers", [
-      { field: "company_id", operator: "==", value: saasUser?.id },
-      { field: "date", operator: "==", value: toLocalDateStr() }
-    ])
-    const openCashRegister = activeCashRegister.find(r => r.status === "open")
-    const cashRegisterId = openCashRegister ? openCashRegister.id : null
-
-    if (!asPending && !openCashRegister && !isCourtesy) {
-      toast.error("É obrigatório ter um caixa aberto para fechar pagamentos."); return;
-    }
-
     setSubmitting(true)
     try {
+      let cashRegisterId = null
+
+      if (!asPending && !isCourtesy) {
+        const activeCashRegister = await fetchCollectionWithQueries<CashRegister>("cash_registers", [
+          { field: "company_id", operator: "==", value: saasUser?.id },
+          { field: "date", operator: "==", value: toLocalDateStr() }
+        ])
+        const openCashRegister = activeCashRegister.find(r => r.status === "open")
+        
+        if (!openCashRegister) {
+          toast.error("Não existe caixa aberto para hoje. Abra o caixa antes de confirmar o pagamento.")
+          return
+        }
+        cashRegisterId = openCashRegister.id
+      }
+
       const finalPaymentSplits = paymentSplits.map(s => ({
         method: s.method,
         amount: Number(String(s.amount || "").replace(",", ".")) || 0
@@ -519,9 +524,10 @@ export function CloseAccountModal({ appointment, onClose, onDone }: Props) {
       onDone()
     } catch (err) {
       console.error("Erro ao fechar pagamento:", err)
-      toast.error("Erro ao fechar pagamento")
+      toast.error("Não foi possível confirmar o pagamento. Tente novamente.")
+    } finally {
+      setSubmitting(false)
     }
-    setSubmitting(false)
   }
 
   const autoCreateOrUpdateClient = async (apt: Appointment, paidValue: number, status: string, debtVal: number, creditVal: number, usedCredit: number) => {

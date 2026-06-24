@@ -74,13 +74,73 @@ export function CloseAccountModal({ appointment, onClose, onDone }: Props) {
     }
 
     if (appointment.is_shared_service && appointment.shared_group_id) {
-      fetchCollectionWhere<Appointment>("appointments", "shared_group_id", "==", appointment.shared_group_id)
-        .then(res => {
+      Promise.all([
+        fetchCollectionWhere<Appointment>("appointments", "shared_group_id", "==", appointment.shared_group_id),
+        fetchCollection<any>("services")
+      ]).then(([res, servicesData]) => {
           setSharedAppointments(res)
           const vals: Record<string, number> = {}
-          res.forEach(r => {
-            vals[r.id] = r.professional_service_value || r.service_price || 0
+          
+          const serviceGroups = new Map<string, Appointment[]>()
+          res.forEach(apt => {
+            const key = apt.service_id || apt.service_name || apt.id
+            if (!serviceGroups.has(key)) {
+              serviceGroups.set(key, [])
+            }
+            serviceGroups.get(key)!.push(apt)
           })
+
+          serviceGroups.forEach((apts, key) => {
+            const count = apts.length
+            const serviceDb = servicesData.find(s => s.id === apts[0].service_id)
+            const defaultDbPrice = serviceDb ? (serviceDb.promotional_price || serviceDb.price || 0) : 0
+            
+            const maxServicePrice = Math.max(...apts.map(a => a.service_price || 0))
+            const sumServicePrice = apts.reduce((acc, a) => acc + (a.service_price || 0), 0)
+            
+            let baseValue = maxServicePrice
+            
+            if (count > 1) {
+              if (defaultDbPrice > 0) {
+                 if (Math.abs(sumServicePrice - defaultDbPrice) < 0.01) {
+                    baseValue = sumServicePrice
+                 } else if (maxServicePrice >= defaultDbPrice) {
+                    baseValue = maxServicePrice
+                 } else if (sumServicePrice > maxServicePrice && Math.abs(maxServicePrice - (sumServicePrice/count)) < 0.01) {
+                    baseValue = sumServicePrice
+                 }
+              } else {
+                 if (sumServicePrice > maxServicePrice && Math.abs(maxServicePrice - (sumServicePrice/count)) < 0.01) {
+                    baseValue = sumServicePrice
+                 }
+              }
+            }
+
+            if (count === 1) {
+              const apt = apts[0]
+              const savedVal = apt.professional_service_value
+              vals[apt.id] = savedVal !== undefined && savedVal !== null ? savedVal : baseValue
+            } else {
+              const splitValue = Math.floor((baseValue / count) * 100) / 100
+              const remainder = Math.round((baseValue - (splitValue * count)) * 100) / 100
+
+              const currentSum = apts.reduce((sum, apt) => sum + (apt.professional_service_value || 0), 0)
+              const hasAllValues = apts.every(apt => apt.professional_service_value !== undefined && apt.professional_service_value !== null)
+              
+              const isManualOverride = hasAllValues && Math.abs(currentSum - baseValue) < 0.01
+
+              apts.forEach((apt, index) => {
+                if (isManualOverride && apt.professional_service_value !== null && apt.professional_service_value !== undefined) {
+                  vals[apt.id] = apt.professional_service_value
+                } else {
+                  let calcValue = splitValue
+                  if (index === 0) calcValue = Math.round((calcValue + remainder) * 100) / 100
+                  vals[apt.id] = calcValue
+                }
+              })
+            }
+          })
+          
           setSharedValues(vals)
         })
     }

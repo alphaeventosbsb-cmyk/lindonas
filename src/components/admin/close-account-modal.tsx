@@ -34,9 +34,9 @@ export function CloseAccountModal({ appointment, onClose, onDone }: Props) {
   const { can } = usePermission()
   
   const [paymentSplits, setPaymentSplits] = useState<{ method: string, amount: string }[]>(
-    appointment.payment_splits?.map(s => ({ method: s.method, amount: s.amount.toString() })) || 
+    appointment.payment_splits?.map(s => ({ method: s.method, amount: s.amount != null ? String(s.amount) : "" })) || 
     (appointment.payment_method && appointment.payment_method !== "multiple" && appointment.payment_method !== "mixed" 
-      ? [{ method: appointment.payment_method, amount: appointment.payment_status === "paid" || appointment.payment_status === "partial" ? (appointment.payment_splits?.[0]?.amount?.toString() || "") : "" }] 
+      ? [{ method: appointment.payment_method, amount: appointment.payment_status === "paid" || appointment.payment_status === "partial" ? (appointment.payment_splits?.[0]?.amount != null ? String(appointment.payment_splits[0].amount) : "") : "" }] 
       : [])
   )
 
@@ -166,7 +166,7 @@ export function CloseAccountModal({ appointment, onClose, onDone }: Props) {
   
   const remainingToPay = Math.max(0, total - creditUsed)
   
-  const totalSplits = paymentSplits.reduce((acc, s) => acc + (Number(s.amount.replace(",", ".")) || 0), 0)
+  const totalSplits = paymentSplits.reduce((acc, s) => acc + (Number(String(s.amount || "").replace(",", ".")) || 0), 0)
   const paidAmount = isCourtesy ? 0 : totalSplits
   
   const valorTotalPago = creditUsed + paidAmount
@@ -208,7 +208,7 @@ export function CloseAccountModal({ appointment, onClose, onDone }: Props) {
     try {
       const finalPaymentSplits = paymentSplits.map(s => ({
         method: s.method,
-        amount: Number(s.amount.replace(",", ".")) || 0
+        amount: Number(String(s.amount || "").replace(",", ".")) || 0
       })).filter(s => s.amount > 0)
 
       const isMixed = finalPaymentSplits.length > 1

@@ -317,12 +317,22 @@ export function NewAppointmentModal({ onClose, onDone, prefill, editMode }: Prop
 
     const emp = employees.find(e => e.id === selectedEmployee) || null
     
+    const bypassFlags: any = {}
+
     if (selectedEmployee) {
       const conflict = checkAppointmentConflict(time, duration, date, selectedEmployee, store.appointments, prefill?.id)
       if (conflict.hasConflict) {
         if (conflict.type === 'appointment') {
-          toast.error("Horário indisponível. Já existe um agendamento para este profissional neste período.")
-          return
+          const profName = employees.find(e => e.id === selectedEmployee)?.name || "Profissional"
+          const msg = `Já existe um agendamento para este profissional neste período.\n\nDeseja criar outro agendamento no mesmo horário?`
+          const confirmed = await confirm({
+            title: "Horário já ocupado",
+            message: msg,
+            confirmText: "Agendar mesmo assim",
+            cancelText: "Cancelar"
+          })
+          if (!confirmed) return
+          bypassFlags._bypass_appointment_overlap = true
         } else if (conflict.type === 'block') {
           const msg = `Este horário está bloqueado para este profissional. Deseja agendar mesmo assim?\n\nMotivo: ${conflict.conflict?.client_name || 'Bloqueio'}\nHorário do bloqueio: ${conflict.conflict?.appointment_time} → ${conflict.conflict?.end_time || '-'}\nHorário do agendamento: ${time}`
           const confirmed = await confirm({
@@ -332,6 +342,7 @@ export function NewAppointmentModal({ onClose, onDone, prefill, editMode }: Prop
             cancelText: "Cancelar"
           })
           if (!confirmed) return
+          bypassFlags._bypass_block = true
         }
       }
     }
@@ -343,8 +354,15 @@ export function NewAppointmentModal({ onClose, onDone, prefill, editMode }: Prop
       if (conflict.hasConflict) {
         const profName = employees.find(e => e.id === assistantId)?.name || "Profissional"
         if (conflict.type === 'appointment') {
-          toast.error(`Horário indisponível para o profissional de apoio ${profName}. Já existe um agendamento neste período.`)
-          return
+          const msg = `Já existe um agendamento para o profissional de apoio ${profName} neste período.\n\nDeseja criar outro agendamento no mesmo horário?`
+          const confirmed = await confirm({
+            title: "Horário já ocupado (Apoio)",
+            message: msg,
+            confirmText: "Agendar mesmo assim",
+            cancelText: "Cancelar"
+          })
+          if (!confirmed) return
+          bypassFlags._bypass_appointment_overlap = true
         } else if (conflict.type === 'block') {
           const msg = `Este horário está bloqueado para o profissional de apoio ${profName}. Deseja agendar mesmo assim?`
           const confirmed = await confirm({
@@ -354,6 +372,7 @@ export function NewAppointmentModal({ onClose, onDone, prefill, editMode }: Prop
             cancelText: "Cancelar"
           })
           if (!confirmed) return
+          bypassFlags._bypass_block = true
         }
       }
     }
@@ -365,8 +384,15 @@ export function NewAppointmentModal({ onClose, onDone, prefill, editMode }: Prop
       if (conflict.hasConflict) {
         const profName = employees.find(e => e.id === block.employeeId)?.name || "Profissional"
         if (conflict.type === 'appointment') {
-          toast.error(`Horário indisponível para ${profName} às ${block.time}. Já existe um agendamento.`)
-          return
+          const msg = `Já existe um agendamento para ${profName} às ${block.time}.\n\nDeseja criar outro agendamento no mesmo horário?`
+          const confirmed = await confirm({
+            title: "Horário já ocupado (Adicional)",
+            message: msg,
+            confirmText: "Agendar mesmo assim",
+            cancelText: "Cancelar"
+          })
+          if (!confirmed) return
+          bypassFlags._bypass_appointment_overlap = true
         } else if (conflict.type === 'block') {
           const msg = `O horário de ${block.time} está bloqueado para ${profName}. Deseja agendar mesmo assim?`
           const confirmed = await confirm({
@@ -376,6 +402,7 @@ export function NewAppointmentModal({ onClose, onDone, prefill, editMode }: Prop
             cancelText: "Cancelar"
           })
           if (!confirmed) return
+          bypassFlags._bypass_block = true
         }
       }
     }
@@ -415,7 +442,7 @@ export function NewAppointmentModal({ onClose, onDone, prefill, editMode }: Prop
     try {
       // ── EDIT MODE: update existing appointment ──
       if (editMode && prefill?.id) {
-        const updateData: any = {}
+        const updateData: any = { ...bypassFlags }
         const logParts: string[] = []
 
         // Detect what changed
@@ -545,14 +572,15 @@ export function NewAppointmentModal({ onClose, onDone, prefill, editMode }: Prop
       }
 
       const newApt = await createDocument("appointments", {
+        ...bypassFlags,
         company_id: "default",
         service_id: selectedService,
         service_name: svc?.name || "",
         service_price: finalServicePrice,
         is_shared_service: isSharedService || null,
         shared_group_id: sharedGroupId,
-        service_total_value: serviceTotalValue || null,
-        professional_service_value: professionalServiceValue || null,
+        service_total_value: serviceTotalValue,
+        professional_service_value: professionalServiceValue,
         employee_id: selectedEmployee || null,
         employee_name: employees.find(e => e.id === selectedEmployee)?.name || null,
         client_id: selectedClient?.id || null,
@@ -614,6 +642,7 @@ export function NewAppointmentModal({ onClose, onDone, prefill, editMode }: Prop
         for (const assistantId of validAssistants) {
           const asstProfName = employees.find(e => e.id === assistantId)?.name || 'Não definido'
           const asstApt = await createDocument("appointments", {
+            ...bypassFlags,
             company_id: "default",
             service_id: selectedService,
             service_name: svc?.name || "",
@@ -772,6 +801,7 @@ export function NewAppointmentModal({ onClose, onDone, prefill, editMode }: Prop
             })
 
             const newAptData = {
+              ...bypassFlags,
               company_id: "default",
               client_id: selectedClient?.id || null,
               client_name: clientName,

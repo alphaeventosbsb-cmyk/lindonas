@@ -12,11 +12,13 @@ interface Props {
   appointment: Appointment
   top: number
   height: number
+  leftPercent?: number
+  widthPercent?: number
   onClick: () => void
   onContextMenu: (e: React.MouseEvent) => void
 }
 
-export function AppointmentCard({ appointment, top, height, onClick, onContextMenu }: Props) {
+export function AppointmentCard({ appointment, top, height, leftPercent, widthPercent, onClick, onContextMenu }: Props) {
   const store = useAgendaStore()
   const sc = statusCfg[appointment.status] || statusCfg.pending
   const labels = store.labels.filter(l => (appointment.label_ids || []).includes(l.id))
@@ -75,21 +77,22 @@ export function AppointmentCard({ appointment, top, height, onClick, onContextMe
       style={{
         position: 'absolute',
         top: `${top}px`,
-        left: '4px',
-        right: '4px',
+        left: leftPercent !== undefined ? `calc(${leftPercent * 100}% + 4px)` : '4px',
+        width: widthPercent !== undefined ? `calc(${widthPercent * 100}% - 8px)` : 'calc(100% - 8px)',
         height: `${height - 2}px`,
         borderRadius: '0.5rem',
         overflow: 'hidden',
         cursor: 'pointer',
-        zIndex: isDragging ? 50 : 3,
-        transition: 'box-shadow 0.15s, transform 0.1s, opacity 0.25s',
+        zIndex: isDragging ? 50 : (store.hoveredAppointment?.id === appointment.id ? 60 : 3),
+        transition: 'box-shadow 0.15s, transform 0.1s, opacity 0.25s, z-index 0.15s',
         background: isCut ? `${bg}88` : bg,
         border: isCut ? `2px dashed ${dot}88` : `${borderWidth} ${borderStyle} ${border}`,
         boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
       }}
       whileHover={{
         boxShadow: `0 4px 16px rgba(0,0,0,0.1), 0 0 0 1px ${dot}40`,
-        y: -1,
+        scale: 1.02,
+        zIndex: 60,
       }}
     >
       {/* Status accent bar */}

@@ -85,12 +85,13 @@ function withTimeout<T>(promise: Promise<T>): Promise<T> {
 }
 
 export async function createDocument(collectionName: string, data: any) {
-  const bypass = data._bypass_conflict
-  if (data._bypass_conflict !== undefined) {
-    delete data._bypass_conflict
-  }
+  const bypassAppointmentOverlap = data._bypass_appointment_overlap
+  const bypassBlock = data._bypass_block
+  if (data._bypass_appointment_overlap !== undefined) delete data._bypass_appointment_overlap
+  if (data._bypass_block !== undefined) delete data._bypass_block
+  if (data._bypass_conflict !== undefined) delete data._bypass_conflict
 
-  if (!bypass && collectionName === "appointments" && data.employee_id && data.appointment_date && data.appointment_time && data.duration_minutes) {
+  if (collectionName === "appointments" && data.employee_id && data.appointment_date && data.appointment_time && data.duration_minutes) {
     const q = query(collection(db(), "appointments"),
       where("employee_id", "==", data.employee_id),
       where("appointment_date", "==", data.appointment_date)
@@ -110,7 +111,17 @@ export async function createDocument(collectionName: string, data: any) {
       const [ah, am] = (a.appointment_time || "00:00").split(':').map(Number)
       const aStart = ah * 60 + am
       const aEnd = aStart + (a.duration_minutes || 0)
-      return (aptStart < aEnd && aptEnd > aStart)
+      
+      const overlaps = aptStart < aEnd && aptEnd > aStart
+      if (!overlaps) return false
+      
+      if (a.type === 'block') {
+        if (!bypassBlock) return true
+        return false // Bypassed block
+      }
+      
+      if (!bypassAppointmentOverlap) return true
+      return false // Bypassed overlap
     })
     
     if (hasConflict) {
@@ -187,6 +198,12 @@ export async function updateAppointment(
     professional_name?: string
   }
 ) {
+  const bypassAppointmentOverlap = updateData._bypass_appointment_overlap
+  const bypassBlock = updateData._bypass_block
+  if (updateData._bypass_appointment_overlap !== undefined) delete updateData._bypass_appointment_overlap
+  if (updateData._bypass_block !== undefined) delete updateData._bypass_block
+  if (updateData._bypass_conflict !== undefined) delete updateData._bypass_conflict
+
   if (updateData.appointment_time || updateData.duration_minutes || updateData.appointment_date || updateData.employee_id) {
     const existingDoc = await getDoc(doc(db(), "appointments", appointmentId))
     if (existingDoc.exists()) {
@@ -217,7 +234,17 @@ export async function updateAppointment(
           const [ah, am] = (a.appointment_time || "00:00").split(':').map(Number)
           const aStart = ah * 60 + am
           const aEnd = aStart + (a.duration_minutes || 0)
-          return (aptStart < aEnd && aptEnd > aStart)
+          
+          const overlaps = aptStart < aEnd && aptEnd > aStart
+          if (!overlaps) return false
+          
+          if (a.type === 'block') {
+            if (!bypassBlock) return true
+            return false // Bypassed block
+          }
+          
+          if (!bypassAppointmentOverlap) return true
+          return false // Bypassed overlap
         })
         
         if (hasConflict) {

@@ -421,14 +421,23 @@ export default function AgendaPage() {
       }
       const apt = store.appointments.find(a => a.id === appointmentId)
       
+      const bypassFlags: any = {}
+
       if (apt) {
         const timeToCheck = newTime || apt.appointment_time
         
         const conflict = checkAppointmentConflict(timeToCheck, apt.duration_minutes, apt.appointment_date, newEmployeeId, store.appointments, apt.id)
         if (conflict.hasConflict) {
           if (conflict.type === 'appointment') {
-            toast.error("Horário indisponível. Já existe um agendamento para este profissional neste período.")
-            return
+            const msg = `Já existe um agendamento para este profissional neste período.\n\nDeseja mover o agendamento mesmo assim?`
+            const confirmed = await confirm({
+              title: "Horário já ocupado",
+              message: msg,
+              confirmText: "Mover mesmo assim",
+              cancelText: "Cancelar"
+            })
+            if (!confirmed) return
+            bypassFlags._bypass_appointment_overlap = true
           } else if (conflict.type === 'block') {
             const msg = `Este horário está bloqueado para este profissional. Deseja agendar mesmo assim?\n\nMotivo: ${conflict.conflict?.client_name || 'Bloqueio'}\nHorário do bloqueio: ${conflict.conflict?.appointment_time} → ${conflict.conflict?.end_time || '-'}\nHorário do agendamento: ${timeToCheck}`
             const confirmed = await confirm({
@@ -438,6 +447,7 @@ export default function AgendaPage() {
               cancelText: "Cancelar"
             })
             if (!confirmed) return
+            bypassFlags._bypass_block = true
           }
         }
 
@@ -475,7 +485,7 @@ export default function AgendaPage() {
         }
       }
 
-      const updateData: any = { employee_id: newEmployeeId, updated_at: new Date().toISOString() }
+      const updateData: any = { ...bypassFlags, employee_id: newEmployeeId, updated_at: new Date().toISOString() }
       if (targetEmp) updateData.employee_name = targetEmp.name
       if (newTime && apt) {
         updateData.appointment_time = newTime

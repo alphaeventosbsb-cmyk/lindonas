@@ -19,6 +19,7 @@ export function AppointmentTooltip() {
   const [activeApt, setActiveApt] = useState<Appointment | null>(null)
   const [isHoveringTooltip, setIsHoveringTooltip] = useState(false)
   const closeTimeout = useRef<NodeJS.Timeout | null>(null)
+  const openTimeout = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -33,8 +34,12 @@ export function AppointmentTooltip() {
   useEffect(() => {
     if (apt) {
       if (closeTimeout.current) clearTimeout(closeTimeout.current)
-      setActiveApt(apt)
+      if (openTimeout.current) clearTimeout(openTimeout.current)
+      openTimeout.current = setTimeout(() => {
+        setActiveApt(apt)
+      }, 2000)
     } else if (!isHoveringTooltip) {
+      if (openTimeout.current) clearTimeout(openTimeout.current)
       closeTimeout.current = setTimeout(() => {
         setActiveApt(null)
       }, 250) // 250ms delay keeps it open long enough to move mouse into it

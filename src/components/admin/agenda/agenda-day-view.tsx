@@ -667,6 +667,7 @@ function DroppableSlot({ id, children, style, onMouseEnter, onMouseLeave, onClic
 }
 
 import { professionalWorksOnDate } from "@/lib/utils"
+import { calculateOverlappingLayout } from "@/lib/agenda-layout-utils"
 
 /* ── Professional Column ──────────────────────────────── */
 function ProfessionalColumn({ employee, appointments, isToday, currentTimePos, onAction, onStatusChange, confirmFn, timeSlots, getCardPosition, getCardHeight, slotHeight, columnWidth, startHour, endHour }: {
@@ -983,16 +984,18 @@ function ProfessionalColumn({ employee, appointments, isToday, currentTimePos, o
       )}
 
       {/* Appointment cards */}
-      {appointments.map(apt => (
+      {calculateOverlappingLayout(appointments).map(placed => (
         <AppointmentCard
-          key={apt.id}
-          appointment={apt}
-          top={getCardPosition(apt.appointment_time)}
-          height={getCardHeight(apt.duration_minutes)}
-          onClick={() => store.setSelectedAppointment(apt)}
+          key={placed.appointment.id}
+          appointment={placed.appointment}
+          top={getCardPosition(placed.appointment.appointment_time)}
+          height={getCardHeight(placed.appointment.duration_minutes)}
+          leftPercent={placed.left}
+          widthPercent={placed.width}
+          onClick={() => store.setSelectedAppointment(placed.appointment)}
           onContextMenu={(e) => {
             e.preventDefault()
-            store.setContextMenu({ appointment: apt, x: e.clientX, y: e.clientY })
+            store.setContextMenu({ appointment: placed.appointment, x: e.clientX, y: e.clientY })
           }}
         />
       ))}

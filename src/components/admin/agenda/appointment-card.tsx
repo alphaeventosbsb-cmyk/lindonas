@@ -94,15 +94,14 @@ export function AppointmentCard({ appointment, top, height, leftPercent, widthPe
         borderRadius: '0.5rem',
         overflow: isHovered ? 'visible' : 'hidden',
         cursor: 'pointer',
-        zIndex: isDragging ? 50 : (isHovered ? 999 : 3),
-        transition: 'all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1)',
+        zIndex: isDragging ? 50 : (isHovered ? 9999 : 3),
+        transition: 'box-shadow 0.2s, transform 0.2s, width 0.2s, background 0.2s, border 0.2s',
         background: isCut ? `${bg}88` : bg,
         border: isCut ? `2px dashed ${dot}88` : `${borderWidth} ${borderStyle} ${border}`,
         boxShadow: isHovered ? `0 12px 30px rgba(0,0,0,0.18), 0 0 0 1px ${dot}40` : '0 1px 4px rgba(0,0,0,0.06)',
       }}
       whileHover={{
         scale: 1.02,
-        zIndex: 999,
       }}
     >
       {/* Status accent bar */}

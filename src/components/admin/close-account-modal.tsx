@@ -192,16 +192,16 @@ export function CloseAccountModal({ appointment, onClose, onDone }: Props) {
     const nonManual = newSplits.filter(s => !s.manuallyEdited)
     
     if (newSplits.length === 1 && nonManual.length === 1) {
-       return [{ ...newSplits[0], amount: totalToPay > 0 ? totalToPay.toFixed(2).replace(".", ",") : "" }]
+       return [{ ...newSplits[0], amount: totalToPay > 0 ? totalToPay.toFixed(2) : "" }]
     }
     
     if (nonManual.length > 0) {
       return newSplits.map(s => {
         if (s.manuallyEdited) return s
         if (s.method === nonManual[nonManual.length - 1].method) {
-           return { ...s, amount: remaining > 0 ? remaining.toFixed(2).replace(".", ",") : "0,00" }
+           return { ...s, amount: remaining > 0 ? remaining.toFixed(2) : "0.00" }
         } else {
-           return { ...s, amount: "0,00" }
+           return { ...s, amount: "0.00" }
         }
       })
     }

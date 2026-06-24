@@ -1022,11 +1022,11 @@ export function CloseAccountModal({ appointment, onClose, onDone }: Props) {
               {submitting ? "..." : "Salvar Pendente"}
             </button>
           </div>
-          <button onClick={() => handleSubmit(false)} disabled={submitting || (!method && paidAmount > 0)} style={{
+          <button onClick={() => handleSubmit(false)} disabled={submitting || (paymentSplits.length === 0 && paidAmount > 0)} style={{
             width: '100%', padding: '0.875rem', borderRadius: '0.75rem', border: 'none',
-            background: (method || paidAmount === 0) ? 'linear-gradient(135deg,#059669,#34d399)' : '#d1d5db',
-            color: '#fff', fontWeight: 700, fontSize: '0.9375rem', cursor: (method || paidAmount === 0) ? 'pointer' : 'not-allowed',
-            opacity: submitting ? 0.7 : 1, boxShadow: (method || paidAmount === 0) ? '0 4px 14px rgba(5,150,105,0.3)' : 'none',
+            background: (paymentSplits.length > 0 || paidAmount === 0) ? 'linear-gradient(135deg,#059669,#34d399)' : '#d1d5db',
+            color: '#fff', fontWeight: 700, fontSize: '0.9375rem', cursor: (paymentSplits.length > 0 || paidAmount === 0) ? 'pointer' : 'not-allowed',
+            opacity: submitting ? 0.7 : 1, boxShadow: (paymentSplits.length > 0 || paidAmount === 0) ? '0 4px 14px rgba(5,150,105,0.3)' : 'none',
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
           }}>
             <CheckCircle style={{ width: '18px', height: '18px' }} />

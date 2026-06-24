@@ -580,13 +580,35 @@ export function AppointmentDetailsDrawer({ appointment, employees, labels, onClo
                     </div>
                     <div>
                       <p style={{ fontSize: '0.5625rem', color: '#8b8fa7', fontWeight: 700, textTransform: 'uppercase' }}>Forma Pagamento</p>
-                      <p style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#1e1e2d' }}>
-                        {appointment.payment_method ? (
-                          appointment.payment_method === 'credit_card' ? 'Cartão de Crédito' :
-                          appointment.payment_method === 'debit_card' ? 'Cartão de Débito' :
-                          appointment.payment_method === 'pix' ? 'PIX' : 'Dinheiro'
-                        ) : 'Não informado'}
-                      </p>
+                      {(() => {
+                        const dict: Record<string, string> = {
+                          cash: 'Dinheiro', pix: 'PIX', credit_card: 'Crédito', debit_card: 'Débito', transfer: 'Transferência', courtesy: 'Cortesia', client_credit: 'Crédito do Cliente', multiple: 'Pagamento misto', mixed: 'Pagamento misto', other: 'Outro'
+                        }
+                        
+                        const splits = (appointment.payment_splits || []).filter((s: any) => Number(String(s.amount || "").replace(",", ".")) > 0 || s.method === "courtesy")
+                        
+                        if (splits.length > 1) {
+                          return (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', marginTop: '0.25rem' }}>
+                              <p style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#1e1e2d' }}>Pagamento misto</p>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.125rem', paddingLeft: '0.25rem', borderLeft: '2px solid #e8ecf4' }}>
+                                {splits.map((s: any, idx: number) => (
+                                  <p key={idx} style={{ fontSize: '0.6875rem', color: '#4b5563', display: 'flex', justifyContent: 'space-between', paddingLeft: '0.375rem' }}>
+                                    <span>{dict[s.method] || s.method}:</span>
+                                    <span style={{ fontWeight: 600 }}>{formatCurrency(Number(String(s.amount || "").replace(",", ".")) || 0)}</span>
+                                  </p>
+                                ))}
+                              </div>
+                            </div>
+                          )
+                        } else if (splits.length === 1) {
+                          return <p style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#1e1e2d' }}>{dict[splits[0].method] || splits[0].method}</p>
+                        } else if (appointment.payment_method) {
+                          return <p style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#1e1e2d' }}>{dict[appointment.payment_method] || appointment.payment_method}</p>
+                        } else {
+                          return <p style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#1e1e2d' }}>Não informado</p>
+                        }
+                      })()}
                     </div>
                     <div>
                       <p style={{ fontSize: '0.5625rem', color: '#8b8fa7', fontWeight: 700, textTransform: 'uppercase' }}>Status Pagamento</p>

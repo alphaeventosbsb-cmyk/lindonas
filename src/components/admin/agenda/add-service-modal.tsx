@@ -3,7 +3,7 @@ import { useState, useMemo, useEffect } from "react"
 import { X, Plus, Trash2, Clock, User, FileText, Tag, Calendar, MessageSquare, Briefcase, Users } from "lucide-react"
 import type { Appointment, Service } from "@/lib/types/database"
 import { updateAppointment, createDocument, fetchCollectionWhere } from "@/lib/firebase/client-utils"
-import { formatCurrency, formatPhone } from "@/lib/utils"
+import { formatCurrency, formatPhone, checkAppointmentConflict, checkBusinessRules } from "@/lib/utils"
 import { toast } from "sonner"
 import { useAgendaStore } from "./agenda-store"
 import { useConfirm } from "@/components/ui/confirm-modal"
@@ -163,6 +163,82 @@ export function AddServiceModal({ appointment, onClose, onSuccess, onAction }: P
       }
     }
 
+    // Validações de conflitos e regras de negócio
+    for (const assistantId of assistants) {
+      if (!assistantId) continue;
+      const conflict = checkAppointmentConflict(appointment.appointment_time, appointment.duration_minutes, appointment.appointment_date, assistantId, store.appointments, appointment.id)
+      if (conflict.hasConflict) {
+        const profName = employees.find(e => e.id === assistantId)?.name || "Profissional"
+        if (conflict.type === 'appointment') {
+          const msg = `Já existe um agendamento para o profissional de apoio ${profName} neste período.\n\nDeseja criar outro agendamento no mesmo horário?`
+          const confirmed = await confirm({ title: "Horário já ocupado (Apoio)", message: msg, confirmText: "Agendar mesmo assim", cancelText: "Cancelar" })
+          if (!confirmed) return
+        } else if (conflict.type === 'block') {
+          const msg = `Este horário está bloqueado para o profissional de apoio ${profName}. Deseja agendar mesmo assim?`
+          const confirmed = await confirm({ title: "Horário bloqueado (Apoio)", message: msg, confirmText: "Agendar mesmo assim", cancelText: "Cancelar" })
+          if (!confirmed) return
+        }
+      }
+    }
+
+    const parseNumber = (val: string | number) => {
+      if (val === "" || val === null || val === undefined) return 0;
+      if (typeof val === 'number') return isNaN(val) ? 0 : val;
+      const str = val.toString().trim();
+      if (str.includes('.') && str.includes(',')) return Number(str.replace(/\./g, '').replace(',', '.')) || 0;
+      if (str.includes(',')) return Number(str.replace(',', '.')) || 0;
+      return Number(str) || 0;
+    }
+
+    for (const block of blocks) {
+      const bDuration = parseNumber(block.duration);
+      const conflict = checkAppointmentConflict(block.time, bDuration, block.date, block.employeeId, store.appointments, appointment.id)
+      if (conflict.hasConflict) {
+        const profName = employees.find(e => e.id === block.employeeId)?.name || "Profissional"
+        if (conflict.type === 'appointment') {
+          const msg = `Já existe um agendamento para ${profName} às ${block.time}.\n\nDeseja criar outro agendamento no mesmo horário?`
+          const confirmed = await confirm({ title: "Horário já ocupado (Adicional)", message: msg, confirmText: "Agendar mesmo assim", cancelText: "Cancelar" })
+          if (!confirmed) return
+        } else if (conflict.type === 'block') {
+          const msg = `O horário de ${block.time} está bloqueado para ${profName}. Deseja agendar mesmo assim?`
+          const confirmed = await confirm({ title: "Horário bloqueado (Adicional)", message: msg, confirmText: "Agendar mesmo assim", cancelText: "Cancelar" })
+          if (!confirmed) return
+        }
+      }
+
+      const emp = employees.find(e => e.id === block.employeeId) || null
+      const businessRule = checkBusinessRules(block.time, bDuration, block.date, emp, store.businessHours, store.blockedDates)
+      if (businessRule.errorType === 'blocked_date') {
+        const msg = `Esta data está bloqueada${businessRule.reason ? `: ${businessRule.reason}` : ''}. Deseja criar o agendamento mesmo assim?`
+        const confirmed = await confirm({ title: "Data bloqueada", message: msg, confirmText: "Criar mesmo assim", cancelText: "Cancelar" })
+        if (!confirmed) return
+      } else if (businessRule.errorType === 'closed_day') {
+        if (businessRule.reason === 'Profissional não atende neste dia.') {
+          const msg = "Este profissional está de folga nesta data. Deseja criar o agendamento mesmo assim?"
+          const confirmed = await confirm({ title: "Profissional de Folga", message: msg, confirmText: "Confirmar agendamento", cancelText: "Cancelar" })
+          if (!confirmed) return
+        } else {
+          const msg = "O estabelecimento está fechado nesta data. Deseja criar o agendamento mesmo assim?"
+          const confirmed = await confirm({ title: "Estabelecimento Fechado", message: msg, confirmText: "Criar mesmo assim", cancelText: "Cancelar" })
+          if (!confirmed) return
+        }
+      } else if (businessRule.errorType === 'out_of_hours') {
+        if (businessRule.reason === 'Horário de almoço do profissional') {
+          const msg = "Este profissional está em horário de almoço neste período. Deseja criar este agendamento mesmo assim?"
+          const confirmed = await confirm({ title: "Horário de Almoço", message: msg, confirmText: "Confirmar agendamento", cancelText: "Cancelar" })
+          if (!confirmed) return
+        } else if (businessRule.reason === 'Horário de intervalo do profissional') {
+          const msg = "Este profissional está em intervalo neste período. Deseja criar este agendamento mesmo assim?"
+          const confirmed = await confirm({ title: "Horário de Intervalo", message: msg, confirmText: "Confirmar agendamento", cancelText: "Cancelar" })
+          if (!confirmed) return
+        } else {
+          const msg = `Este agendamento termina às ${businessRule.endTimeStr}, mas o expediente termina às ${businessRule.closingTimeStr}.\nDeseja criar mesmo assim?`
+          const confirmed = await confirm({ title: "Agendamento fora do expediente", message: msg, confirmText: "Criar mesmo assim", cancelText: "Cancelar" })
+          if (!confirmed) return
+        }
+      }
+    }
+
     setLoading(true)
     try {
       const validAssistants = assistants.filter(a => a !== "")
@@ -195,7 +271,7 @@ export function AddServiceModal({ appointment, onClose, onSuccess, onAction }: P
         
         // Update existing sharedApts
         for (const apt of sharedApts) {
-          const additionalPrice = apt.additional_services?.reduce((acc, b) => acc + (Number(b.price) || 0), 0) || 0
+          const additionalPrice = apt.additional_services?.reduce((acc, b) => acc + (parseNumber(b.price)), 0) || 0
           const newServicePrice = newBaseShare + additionalPrice
           
           await updateAppointment(
@@ -240,7 +316,7 @@ export function AddServiceModal({ appointment, onClose, onSuccess, onAction }: P
             label_ids: localLabelIds,
             priority_color: appointment.priority_color || null,
             is_shared_service: true,
-            shared_group_id: sharedGroupId,
+            shared_group_id: sharedGroupId || null,
             additional_services: [],
             created_by_user_id: saasUser?.id || null,
             created_by_name: saasUser?.name || null,
@@ -283,7 +359,7 @@ export function AddServiceModal({ appointment, onClose, onSuccess, onAction }: P
       sharedApts.forEach(a => { originalGroupTotal += (a.service_price || 0) })
       
       let addedBlocksTotal = 0
-      blocks.forEach(b => { addedBlocksTotal += Number(b.price) })
+      blocks.forEach(b => { addedBlocksTotal += parseNumber(b.price) })
       
       const newGrandTotal = originalGroupTotal + addedBlocksTotal
 
@@ -293,8 +369,8 @@ export function AddServiceModal({ appointment, onClose, onSuccess, onAction }: P
 
         if (existingApt) {
           // Update existing appointment
-          const addedPrice = empBlocks.reduce((acc, b) => acc + Number(b.price), 0)
-          const addedDuration = empBlocks.reduce((acc, b) => acc + Number(b.duration), 0)
+          const addedPrice = empBlocks.reduce((acc, b) => acc + parseNumber(b.price), 0)
+          const addedDuration = empBlocks.reduce((acc, b) => acc + parseNumber(b.duration), 0)
 
           const newAdditionalServices = [
             ...(existingApt.additional_services || []),
@@ -304,8 +380,8 @@ export function AddServiceModal({ appointment, onClose, onSuccess, onAction }: P
               return {
                 service_id: b.serviceId,
                 service_name: s?.name || "",
-                price: Number(b.price),
-                duration_minutes: Number(b.duration),
+                price: parseNumber(b.price),
+                duration_minutes: parseNumber(b.duration),
                 employee_id: b.employeeId,
                 employee_name: e?.name || null
               }
@@ -336,7 +412,7 @@ export function AddServiceModal({ appointment, onClose, onSuccess, onAction }: P
 
           if (isShared) {
             updateData.is_shared_service = true
-            updateData.shared_group_id = sharedGroupId
+            updateData.shared_group_id = sharedGroupId || null
           }
 
           await updateAppointment(
@@ -356,8 +432,8 @@ export function AddServiceModal({ appointment, onClose, onSuccess, onAction }: P
           const sName = services.find(svc => svc.id === firstBlock.serviceId)?.name || ""
           const eName = employees.find(emp => emp.id === firstBlock.employeeId)?.name || ""
 
-          const addedPrice = empBlocks.reduce((acc, b) => acc + Number(b.price), 0)
-          const addedDuration = empBlocks.reduce((acc, b) => acc + Number(b.duration), 0)
+          const addedPrice = empBlocks.reduce((acc, b) => acc + parseNumber(b.price), 0)
+          const addedDuration = empBlocks.reduce((acc, b) => acc + parseNumber(b.duration), 0)
 
           const [h, m] = firstBlock.time.split(":").map(Number)
           const totalMin = h * 60 + m + addedDuration
@@ -369,15 +445,15 @@ export function AddServiceModal({ appointment, onClose, onSuccess, onAction }: P
             return {
               service_id: b.serviceId,
               service_name: s?.name || "",
-              price: Number(b.price),
-              duration_minutes: Number(b.duration),
+              price: parseNumber(b.price),
+              duration_minutes: parseNumber(b.duration),
               employee_id: b.employeeId,
               employee_name: e?.name || null
             }
           })
 
           const newAptData = {
-            company_id: appointment.company_id,
+            company_id: appointment.company_id || "",
             client_id: appointment.client_id || null,
             client_name: appointment.client_name || "",
             client_phone: appointment.client_phone || "",
@@ -400,7 +476,7 @@ export function AddServiceModal({ appointment, onClose, onSuccess, onAction }: P
             label_ids: localLabelIds,
             priority_color: appointment.priority_color || null,
             is_shared_service: true,
-            shared_group_id: sharedGroupId,
+            shared_group_id: sharedGroupId || null,
             additional_services: newAdditionalServices,
             created_by_user_id: saasUser?.id || null,
             created_by_name: saasUser?.name || null,
@@ -452,9 +528,9 @@ export function AddServiceModal({ appointment, onClose, onSuccess, onAction }: P
       if (!closeAccount) {
         onClose()
       }
-    } catch (err) {
-      console.error(err)
-      toast.error("Erro ao salvar os dados")
+    } catch (error) {
+      console.error("Erro ao adicionar serviço ao agendamento:", error)
+      toast.error("Não foi possível adicionar o serviço. Verifique os dados e tente novamente.")
     } finally {
       setLoading(false)
     }
@@ -686,7 +762,7 @@ export function AddServiceModal({ appointment, onClose, onSuccess, onAction }: P
                       </div>
                       <div style={{ flex: 1 }}>
                         <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#64748b', marginBottom: '0.25rem' }}>Valor (R$)</label>
-                        <input type="number" min={0} step="0.01" value={block.price} onChange={e => updateBlock(index, 'price', Number(e.target.value))} style={inputStyle} />
+                        <input type="text" value={block.price} onChange={e => updateBlock(index, 'price', e.target.value)} style={inputStyle} />
                       </div>
                     </div>
 

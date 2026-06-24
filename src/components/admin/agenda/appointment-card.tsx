@@ -68,7 +68,9 @@ export function AppointmentCard({ appointment, top, height, leftPercent, widthPe
   const baseLeft = leftPercent !== undefined ? `calc(${leftPercent * 100}% + 4px)` : '4px'
   const baseWidth = widthPercent !== undefined ? `calc(${widthPercent * 100}% - 8px)` : 'calc(100% - 8px)'
 
-  const activeLeft = isHovered && isOverlapped ? '4px' : baseLeft
+  // O left nunca muda no hover para evitar expandir para a esquerda
+  const activeLeft = baseLeft
+  // O width aumenta para a direita no hover
   const activeWidth = isHovered && isOverlapped ? 'calc(100% - 8px)' : baseWidth
 
   return (
@@ -92,7 +94,7 @@ export function AppointmentCard({ appointment, top, height, leftPercent, widthPe
         borderRadius: '0.5rem',
         overflow: isHovered ? 'visible' : 'hidden',
         cursor: 'pointer',
-        zIndex: isDragging ? 50 : (isHovered ? 60 : 3),
+        zIndex: isDragging ? 50 : (isHovered ? 999 : 3),
         transition: 'all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1)',
         background: isCut ? `${bg}88` : bg,
         border: isCut ? `2px dashed ${dot}88` : `${borderWidth} ${borderStyle} ${border}`,
@@ -100,7 +102,7 @@ export function AppointmentCard({ appointment, top, height, leftPercent, widthPe
       }}
       whileHover={{
         scale: 1.02,
-        zIndex: 60,
+        zIndex: 999,
       }}
     >
       {/* Status accent bar */}

@@ -8,7 +8,7 @@ import { useBusinessSettings } from "@/lib/auth/tenant-context"
 import { ExpandableImage } from "@/components/ui/expandable-image"
 import { statusCfg } from "./status-config"
 import type { Appointment } from "@/lib/types/database"
-import { formatCurrency, formatPhone } from "@/lib/utils"
+import { formatCurrency, formatPhone, toLocalDateStr, calculateSharedServiceSplits } from "@/lib/utils"
 import { Phone, Scissors, User, Calendar, Clock, DollarSign, FileText, Tag, MapPin } from "lucide-react"
 
 export function AppointmentTooltip() {
@@ -343,18 +343,28 @@ export function AppointmentTooltip() {
                   <span style={{ fontSize: '0.5rem', fontWeight: 700, color: '#4f46e5', textTransform: 'uppercase' }}>Equipe (Multi-profissional)</span>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                  {store.appointments.filter(a => a.shared_group_id === currentApt.shared_group_id).map(a => (
-                    <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.625rem' }}>
-                      <span style={{ color: '#334155', fontWeight: a.id === currentApt.id ? 700 : 500 }}>
-                        {a.employee_name || 'Desconhecido'}: {a.service_name}
-                      </span>
-                      <span style={{ color: '#64748b', fontWeight: 600 }}>{formatCurrency(a.service_price)}</span>
-                    </div>
-                  ))}
-                  <div style={{ borderTop: '1px dashed #cbd5e1', marginTop: '0.125rem', paddingTop: '0.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.625rem' }}>
-                    <span style={{ color: '#0f172a', fontWeight: 800 }}>Total do Grupo</span>
-                    <span style={{ color: '#059669', fontWeight: 800 }}>{formatCurrency(currentApt.service_total_value || currentApt.service_price)}</span>
-                  </div>
+                  {(() => {
+                    const sharedApts = store.appointments.filter(a => a.shared_group_id === currentApt.shared_group_id)
+                    const splits = calculateSharedServiceSplits(sharedApts)
+                    const totalGroup = sharedApts.reduce((sum, a) => sum + (splits[a.id] || 0), 0)
+
+                    return (
+                      <>
+                        {sharedApts.map(a => (
+                          <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.625rem' }}>
+                            <span style={{ color: '#334155', fontWeight: a.id === currentApt.id ? 700 : 500 }}>
+                              {a.employee_name || 'Desconhecido'}: {a.service_name}
+                            </span>
+                            <span style={{ color: '#64748b', fontWeight: 600 }}>{formatCurrency(splits[a.id] || 0)}</span>
+                          </div>
+                        ))}
+                        <div style={{ borderTop: '1px dashed #cbd5e1', marginTop: '0.125rem', paddingTop: '0.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.625rem' }}>
+                          <span style={{ color: '#0f172a', fontWeight: 800 }}>Total do Grupo</span>
+                          <span style={{ color: '#059669', fontWeight: 800 }}>{formatCurrency(totalGroup)}</span>
+                        </div>
+                      </>
+                    )
+                  })()}
                 </div>
               </div>
             )}

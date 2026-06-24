@@ -277,6 +277,51 @@ export function checkBlockConflict(
   return null
 }
 
+export function calculateSharedServiceSplits(sharedAppointments: Appointment[]): Record<string, number> {
+  const vals: Record<string, number> = {}
+  const serviceGroups = new Map<string, Appointment[]>()
+  
+  sharedAppointments.forEach(apt => {
+    const key = apt.service_id || apt.service_name || apt.id
+    if (!serviceGroups.has(key)) serviceGroups.set(key, [])
+    serviceGroups.get(key)!.push(apt)
+  })
+
+  serviceGroups.forEach((apts, key) => {
+    const count = apts.length
+    const maxServicePrice = Math.max(...apts.map(a => a.service_price || 0))
+    const sumServicePrice = apts.reduce((acc, a) => acc + (a.service_price || 0), 0)
+
+    let baseValue = maxServicePrice
+    if (count > 1) {
+      if (sumServicePrice > maxServicePrice && Math.abs(maxServicePrice - (sumServicePrice / count)) < 0.01) {
+        baseValue = sumServicePrice
+      }
+    }
+
+    if (count === 1) {
+      const apt = apts[0]
+      vals[apt.id] = apt.professional_service_value != null ? apt.professional_service_value : baseValue
+    } else {
+      const splitValue = Math.floor((baseValue / count) * 100) / 100
+      const remainder = Math.round((baseValue - (splitValue * count)) * 100) / 100
+
+      const currentSum = apts.reduce((sum, apt) => sum + (apt.professional_service_value || 0), 0)
+      const hasAllValues = apts.every(apt => apt.professional_service_value != null)
+      const isManualOverride = hasAllValues && Math.abs(currentSum - baseValue) < 0.01
+
+      apts.forEach((apt, index) => {
+        if (isManualOverride && apt.professional_service_value != null) {
+          vals[apt.id] = apt.professional_service_value
+        } else {
+          vals[apt.id] = splitValue + (index === 0 ? remainder : 0)
+        }
+      })
+    }
+  })
+  return vals
+}
+
 export function checkAppointmentConflict(
   timeStr: string,
   durationMins: number,

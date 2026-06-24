@@ -60,9 +60,8 @@ export function AppointmentCard({ appointment, top, height, leftPercent, widthPe
     borderWidth = '2px'
   }
 
-  const isCompact = height < 55
-
   const isHovered = store.hoveredAppointment?.id === appointment.id
+  const isCompact = height < 55 && !isHovered
   const isOverlapped = leftPercent !== undefined && widthPercent !== undefined && widthPercent < 1
 
   const baseLeft = leftPercent !== undefined ? `calc(${leftPercent * 100}% + 4px)` : '4px'
@@ -90,7 +89,8 @@ export function AppointmentCard({ appointment, top, height, leftPercent, widthPe
         top: `${top}px`,
         left: activeLeft,
         width: activeWidth,
-        height: `${height - 2}px`,
+        height: isHovered && height < 110 ? 'auto' : `${height - 2}px`,
+        minHeight: `${height - 2}px`,
         borderRadius: '0.5rem',
         overflow: 'hidden',
         cursor: 'pointer',
@@ -204,11 +204,7 @@ export function AppointmentCard({ appointment, top, height, leftPercent, widthPe
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', flexShrink: 1, minWidth: 0, overflow: 'hidden' }}>
             {/* Payment icon */}
-            {!isSpecial && appointment.status === 'closed' ? (
-              <span style={{ fontSize: '0.5rem', fontWeight: 800, color: '#047857', background: '#a7f3d0', padding: '0.125rem 0.25rem', borderRadius: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.125rem' }}>
-                PAGO <CheckCircle style={{ width: '8px', height: '8px' }} />
-              </span>
-            ) : !isSpecial && appointment.payment_status === 'paid' ? (
+            {!isSpecial && appointment.status !== 'closed' && appointment.payment_status === 'paid' ? (
               <CheckCircle style={{ width: '10px', height: '10px', color: '#10b981' }} />
             ) : null}
             {appointment.notes && (
@@ -230,7 +226,12 @@ export function AppointmentCard({ appointment, top, height, leftPercent, widthPe
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.125rem', marginTop: '0.125rem', minWidth: 0, overflow: 'hidden' }}>
             <p style={{
               fontSize: '0.5625rem', color: service?.color_hex || '#4b5563', fontWeight: service?.color_hex ? 700 : 500,
-              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              overflow: 'hidden', 
+              textOverflow: 'ellipsis', 
+              display: '-webkit-box',
+              WebkitLineClamp: isHovered ? 3 : 1,
+              WebkitBoxOrient: 'vertical',
+              whiteSpace: 'normal',
               lineHeight: 1.2,
             }}>
               {isSpecial ? (

@@ -8,7 +8,7 @@ import { useBusinessSettings } from "@/lib/auth/tenant-context"
 import { ExpandableImage } from "@/components/ui/expandable-image"
 import { statusCfg } from "./status-config"
 import type { Appointment } from "@/lib/types/database"
-import { formatCurrency, formatPhone, toLocalDateStr, calculateSharedServiceSplits } from "@/lib/utils"
+import { formatCurrency, formatPhone, toLocalDateStr, calculateSharedServiceSplits, resolveClientForAppointment, getAppointmentClientDisplayName } from "@/lib/utils"
 import { Phone, Scissors, User, Calendar, Clock, DollarSign, FileText, Tag, MapPin } from "lucide-react"
 
 export function AppointmentTooltip() {
@@ -146,13 +146,10 @@ export function AppointmentTooltip() {
                   fontSize: '1rem', fontWeight: 800, color: '#1e1e2d',
                   overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                 }}>
-                  {isSpecial ? currentApt.client_name : (
-                    (() => {
-                      const { resolveClientForAppointment, getAppointmentClientDisplayName } = require('@/lib/utils');
-                      const resolvedClient = resolveClientForAppointment(currentApt, store.clients);
-                      return getAppointmentClientDisplayName(currentApt, resolvedClient);
-                    })()
-                  )}
+                  {(() => {
+                    const resolvedClient = resolveClientForAppointment(currentApt, store.clients);
+                    return isSpecial ? currentApt.client_name : getAppointmentClientDisplayName(currentApt, resolvedClient);
+                  })()}
                 </p>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', flexWrap: 'wrap' }}>
                   <span style={{

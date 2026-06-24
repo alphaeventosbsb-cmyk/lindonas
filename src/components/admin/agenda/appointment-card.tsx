@@ -3,7 +3,7 @@
 import { motion } from "framer-motion"
 import { useAgendaStore } from "./agenda-store"
 import { statusCfg } from "./status-config"
-import { formatCurrency } from "@/lib/utils"
+import { formatCurrency, resolveClientForAppointment, getAppointmentClientDisplayName } from "@/lib/utils"
 import type { Appointment } from "@/lib/types/database"
 import { useDraggable } from "@dnd-kit/core"
 import { Clock, DollarSign, MessageSquare, Tag, CheckCircle, AlertCircle } from "lucide-react"
@@ -154,7 +154,6 @@ export function AppointmentCard({ appointment, top, height, leftPercent, widthPe
           }}>
             {isSpecial ? appointment.client_name : (
               (() => {
-                const { resolveClientForAppointment, getAppointmentClientDisplayName } = require('@/lib/utils');
                 const client = resolveClientForAppointment(appointment, store.clients);
                 return getAppointmentClientDisplayName(appointment, client);
               })()

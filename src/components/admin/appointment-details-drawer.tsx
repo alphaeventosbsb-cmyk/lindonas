@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from "react"
 import { X, Phone, Scissors, User, Calendar, Clock, DollarSign, FileText, Tag, Plus, Check, Trash2, Loader2, AlertTriangle } from "lucide-react"
 import type { Appointment, Employee, AppointmentLabel, AppointmentLog } from "@/lib/types/database"
-import { formatCurrency, formatPhone } from "@/lib/utils"
+import { formatCurrency, formatPhone, resolveClientForAppointment, getAppointmentClientDisplayName } from "@/lib/utils"
 import { updateAppointment, fetchCollectionWhere, deleteDocument, deleteAppointment } from "@/lib/firebase/client-utils"
 import { useTenant } from "@/lib/auth/tenant-context"
 import { toast } from "sonner"
@@ -70,7 +70,6 @@ export function AppointmentDetailsDrawer({ appointment, employees, labels, onClo
   const { saasUser } = useTenant()
   const { ConfirmationDialog, confirm } = useConfirm()
   
-  const { resolveClientForAppointment, getAppointmentClientDisplayName } = require('@/lib/utils');
   const client = resolveClientForAppointment(appointment, store.clients);
   const displayName = isSpecial ? appointment.client_name : getAppointmentClientDisplayName(appointment, client);
   const isFinished = ["closed", "completed", "payment_pending"].includes(appointment.status)

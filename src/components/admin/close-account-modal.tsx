@@ -3,7 +3,7 @@ import { useState, useEffect } from "react"
 import type { Appointment, Client } from "@/lib/types/database"
 import { formatCurrency, formatPhone, toLocalDateStr } from "@/lib/utils"
 import { X, DollarSign, CreditCard, Smartphone, Banknote, ArrowRightLeft, Gift, HelpCircle, User, Scissors, Calendar, Clock, CheckCircle, Loader2, Users } from "lucide-react"
-import { updateAppointment, createDocument, fetchCollectionWhere, updateDocument, fetchCollection, getDocument, fetchCollectionWithQueries } from "@/lib/firebase/client-utils"
+import { updateAppointment, createDocument, fetchCollectionWhere, updateDocument, fetchCollection, getDocument, fetchCollectionWithQueries, normalizeClientFields, checkClientDuplication } from "@/lib/firebase/client-utils"
 import type { CashRegister, Employee, Commission, Product, ServiceProduct, InventoryMovement } from "@/lib/types/database"
 import { useTenant } from "@/lib/auth/tenant-context"
 import { toast } from "sonner"
@@ -590,20 +590,36 @@ export function CloseAccountModal({ appointment, onClose, onDone }: Props) {
           } : {})
         })
       } else {
-        const res = await createDocument("clients", {
+        const norms = normalizeClientFields({
           name: apt.client_name,
           phone: apt.client_phone,
-          email: apt.client_email || null,
-          notes: null,
-          total_spent: paidValue,
-          debt_amount: debtVal,
-          credit_amount: creditVal,
-          status: debtVal > 0 ? "debtor" : "active",
-          appointment_count: 1,
-          last_visit: apt.appointment_date,
-          is_vip: false,
+          email: apt.client_email,
         })
-        clientId = res.id
+        const dupCheck = await checkClientDuplication(companyId!, norms)
+        
+        if (dupCheck.hasDuplicate && dupCheck.client?.id) {
+          clientId = dupCheck.client.id
+          // Optionally we could update the existing client here, but since it's a fallback just link it
+        } else {
+          const res = await createDocument("clients", {
+            company_id: companyId,
+            name: apt.client_name,
+            phone: apt.client_phone,
+            email: apt.client_email || null,
+            email_normalized: norms.email_normalized,
+            phone_normalized: norms.phone_normalized,
+            cpf_normalized: norms.cpf_normalized,
+            notes: null,
+            total_spent: paidValue,
+            debt_amount: debtVal,
+            credit_amount: creditVal,
+            status: debtVal > 0 ? "debtor" : "active",
+            appointment_count: 1,
+            last_visit: apt.appointment_date,
+            is_vip: false,
+          })
+          clientId = res.id
+        }
       }
 
       // 4. Create Transactions for Debits and Credits

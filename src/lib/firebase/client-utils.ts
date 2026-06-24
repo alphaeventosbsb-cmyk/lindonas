@@ -84,12 +84,73 @@ function withTimeout<T>(promise: Promise<T>): Promise<T> {
   ]);
 }
 
+export function normalizeClientFields(data: { email?: string | null, phone?: string | null, cpf?: string | null }) {
+  const email_normalized = data.email ? data.email.trim().toLowerCase() : null
+  const phone_normalized = data.phone ? data.phone.replace(/\D/g, "") : null
+  const cpf_normalized = data.cpf ? data.cpf.replace(/\D/g, "") : null
+  return { 
+    email_normalized: email_normalized || null, 
+    phone_normalized: phone_normalized || null, 
+    cpf_normalized: cpf_normalized || null 
+  }
+}
+
+export async function checkClientDuplication(companyId: string, fields: ReturnType<typeof normalizeClientFields>, excludeClientId?: string) {
+  if (!companyId) return { hasDuplicate: false }
+  
+  const { email_normalized, phone_normalized, cpf_normalized } = fields
+  if (!email_normalized && !phone_normalized && !cpf_normalized) {
+    return { hasDuplicate: false }
+  }
+
+  try {
+    const clients = await fetchCollectionWithQueries<any>("clients", [
+      { field: "company_id", operator: "==", value: companyId }
+    ])
+
+    for (const c of clients) {
+      if (excludeClientId && c.id === excludeClientId) continue
+
+      const c_email = c.email_normalized || (c.email ? c.email.trim().toLowerCase() : null)
+      const c_phone = c.phone_normalized || (c.phone ? c.phone.replace(/\D/g, "") : null)
+      const c_cpf = c.cpf_normalized || (c.cpf ? c.cpf.replace(/\D/g, "") : null)
+
+      if (cpf_normalized && c_cpf === cpf_normalized) {
+        return { hasDuplicate: true, message: `Já existe um cliente cadastrado com este CPF (${c.name || 'Sem nome'}).`, field: 'cpf', client: c }
+      }
+      if (email_normalized && c_email === email_normalized) {
+        return { hasDuplicate: true, message: `Já existe um cliente cadastrado com este e-mail (${c.name || 'Sem nome'}).`, field: 'email', client: c }
+      }
+      if (phone_normalized && c_phone === phone_normalized) {
+        return { hasDuplicate: true, message: `Já existe um cliente cadastrado com este telefone (${c.name || 'Sem nome'}).`, field: 'phone', client: c }
+      }
+    }
+  } catch (err) {
+    console.error("Erro ao checar duplicidade", err)
+  }
+
+  return { hasDuplicate: false }
+}
+
 export async function createDocument(collectionName: string, data: any) {
   const bypassAppointmentOverlap = data._bypass_appointment_overlap
   const bypassBlock = data._bypass_block
   if (data._bypass_appointment_overlap !== undefined) delete data._bypass_appointment_overlap
   if (data._bypass_block !== undefined) delete data._bypass_block
   if (data._bypass_conflict !== undefined) delete data._bypass_conflict
+  if (data._bypass_duplication !== undefined) delete data._bypass_duplication
+
+  if (collectionName === "clients") {
+    const norms = normalizeClientFields(data)
+    data.email_normalized = norms.email_normalized
+    data.phone_normalized = norms.phone_normalized
+    data.cpf_normalized = norms.cpf_normalized
+
+    const dupCheck = await checkClientDuplication(data.company_id, norms)
+    if (dupCheck.hasDuplicate) {
+      throw new Error(dupCheck.message)
+    }
+  }
 
   if (collectionName === "appointments" && data.employee_id && data.appointment_date && data.appointment_time && data.duration_minutes) {
     const q = query(collection(db(), "appointments"),
@@ -140,8 +201,31 @@ export async function createDocument(collectionName: string, data: any) {
 }
 
 export async function updateDocument(collectionName: string, id: string, data: any) {
+  let finalData = { ...data }
+  if (collectionName === "clients") {
+    let compId = finalData.company_id
+    if (!compId) {
+      const existing = await getDoc(doc(db(), collectionName, id))
+      if (existing.exists()) {
+        compId = existing.data().company_id
+      }
+    }
+    
+    if (compId) {
+      const norms = normalizeClientFields(finalData)
+      if (finalData.email !== undefined) finalData.email_normalized = norms.email_normalized
+      if (finalData.phone !== undefined) finalData.phone_normalized = norms.phone_normalized
+      if (finalData.cpf !== undefined) finalData.cpf_normalized = norms.cpf_normalized
+
+      const dupCheck = await checkClientDuplication(compId, norms, id)
+      if (dupCheck.hasDuplicate) {
+        throw new Error(dupCheck.message)
+      }
+    }
+  }
+
   const docRef = doc(db(), collectionName, id)
-  await withTimeout(updateDoc(docRef, { ...data, updated_at: new Date().toISOString() }))
+  await withTimeout(updateDoc(docRef, { ...finalData, updated_at: new Date().toISOString() }))
   const updated = await getDoc(docRef)
   return { id: updated.id, ...updated.data() }
 }

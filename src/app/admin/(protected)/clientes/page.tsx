@@ -174,6 +174,7 @@ export default function ClientesPage() {
 
     let createdCount = 0
     let errorCount = 0
+    let duplicateCount = 0
 
     for (const row of toCreate) {
       try {
@@ -246,13 +247,17 @@ export default function ClientesPage() {
 
         await createDocument("clients", dataToSave)
         createdCount++
-      } catch (err) {
-        console.error("Erro ao importar cliente", row, err)
-        errorCount++
+      } catch (err: any) {
+        if (err.message && err.message.includes("Já existe um cliente cadastrado")) {
+          duplicateCount++
+        } else {
+          console.error("Erro ao importar cliente", row, err)
+          errorCount++
+        }
       }
     }
 
-    toast.success(`Importação concluída! ${createdCount} criados, ${errorCount} falhas.`)
+    toast.success(`Importação concluída! ${createdCount} criados, ${duplicateCount} ignorados (duplicados), ${errorCount} falhas reais.`)
     if (saasUser) {
       logDataAudit({
         company_id: companyId || saasUser.company_id || "unknown",

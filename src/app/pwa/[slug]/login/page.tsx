@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense, use } from "react"
 import { getAuthInstance, googleProvider } from "@/lib/firebase/config"
 import { signInWithPopup, signInWithEmailAndPassword } from "firebase/auth"
-import { fetchCollectionWhere, createDocument, updateDocument } from "@/lib/firebase/client-utils"
+import { fetchCollectionWhere, createDocument, updateDocument, fetchCollectionWithQueries, checkClientDuplication, normalizeClientFields } from "@/lib/firebase/client-utils"
 import { resolvePWATenantBySlug } from "@/lib/pwa/tenant-resolver"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Loader2, ArrowLeft } from "lucide-react"
@@ -25,6 +25,12 @@ function LoginForm({ slug }: { slug: string }) {
   const [error, setError] = useState("")
   const [companyId, setCompanyId] = useState<string | null>(null)
   const [companyData, setCompanyData] = useState<any>(null)
+  
+  const [missingFieldsData, setMissingFieldsData] = useState<any>(null)
+  const [completeName, setCompleteName] = useState("")
+  const [completeEmail, setCompleteEmail] = useState("")
+  const [completePhone, setCompletePhone] = useState("")
+  const [completeCpf, setCompleteCpf] = useState("")
 
   useEffect(() => {
     async function loadCompany() {
@@ -62,10 +68,21 @@ function LoginForm({ slug }: { slug: string }) {
       }
 
       const normalizedEmail = user.email.trim().toLowerCase()
-      const clients = await fetchCollectionWhere("clients", "email", "==", normalizedEmail)
-      const existingClient: any = clients.find((c: any) => c.company_id === companyId)
+      const allClients = await fetchCollectionWithQueries<any>("clients", [
+        { field: "company_id", operator: "==", value: companyId }
+      ])
+      const matchingClients = allClients.filter((c: any) => 
+        (c.email_normalized === normalizedEmail) || 
+        (c.email && c.email.trim().toLowerCase() === normalizedEmail)
+      )
 
-      if (existingClient) {
+      if (matchingClients.length === 1) {
+        const existingClient = matchingClients[0]
+        if (existingClient.auth_uid && existingClient.auth_uid !== user.uid) {
+           setError("Este e-mail está vinculado a outra conta.")
+           setLoading(false)
+           return
+        }
         if (!existingClient.auth_uid || !existingClient.google_email || !existingClient.email_normalized) {
           await updateDocument("clients", existingClient.id, {
             auth_uid: user.uid,
@@ -73,30 +90,70 @@ function LoginForm({ slug }: { slug: string }) {
             email_normalized: normalizedEmail
           })
         }
-      } else {
-        await createDocument("clients", {
-          company_id: companyId,
-          name: user.displayName || "Cliente",
-          email: normalizedEmail,
-          email_normalized: normalizedEmail,
-          auth_uid: user.uid,
-          google_email: normalizedEmail,
-          phone: user.phoneNumber || "",
-          photo_url: user.photoURL || null,
-          total_spent: 0,
-          credit_amount: 0,
-          debt_amount: 0,
-          status: "active",
-          appointment_count: 0,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
+        router.replace(`/pwa/${slug}/cliente/home`)
+        return
+      } else if (matchingClients.length > 1) {
+        setError("Encontramos múltiplos cadastros com este e-mail. Por favor, entre em contato com o salão para unificar seu acesso.")
+        setLoading(false)
+        return
       }
 
-      router.replace(`/pwa/${slug}/cliente/home`)
+      setMissingFieldsData(user)
+      setCompleteName(user.displayName || "")
+      setCompleteEmail(normalizedEmail)
+      setCompletePhone(user.phoneNumber || "")
+      setCompleteCpf("")
+      setLoading(false)
     } catch (err) {
       console.error(err)
       setError("Erro ao processar login. Tente novamente.")
+      setLoading(false)
+    }
+  }
+
+  const handleCompleteRegistration = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!companyId || !missingFieldsData) return
+    setLoading(true)
+    setError("")
+    
+    if (!completeName.trim() || !completeEmail.trim() || !completePhone.trim() || !completeCpf.trim()) {
+      setError("Preencha nome completo, CPF, e-mail e telefone para continuar.")
+      setLoading(false)
+      return
+    }
+
+    try {
+      const norms = normalizeClientFields({ email: completeEmail, phone: completePhone, cpf: completeCpf })
+      const dupCheck = await checkClientDuplication(companyId, norms)
+
+      if (dupCheck.hasDuplicate) {
+        setError("Já existe um cadastro com estes dados. Entre em contato com o salão para recuperar seu acesso.")
+        setLoading(false)
+        return
+      }
+
+      await createDocument("clients", {
+        company_id: companyId,
+        name: completeName,
+        email: completeEmail,
+        email_normalized: norms.email_normalized,
+        phone: completePhone,
+        phone_normalized: norms.phone_normalized,
+        cpf_normalized: norms.cpf_normalized,
+        auth_uid: missingFieldsData.uid,
+        google_email: missingFieldsData.email.trim().toLowerCase(),
+        photo_url: missingFieldsData.photoURL || null,
+        total_spent: 0,
+        credit_amount: 0,
+        debt_amount: 0,
+        status: "active",
+        appointment_count: 0
+      })
+
+      router.replace(`/pwa/${slug}/cliente/home`)
+    } catch(err: any) {
+      setError(err.message || "Erro ao concluir cadastro.")
       setLoading(false)
     }
   }
@@ -163,10 +220,76 @@ function LoginForm({ slug }: { slug: string }) {
 
       {/* Bottom Section - Login Form */}
       <div className="relative z-20 flex-1 bg-white rounded-t-[32px] px-8 pt-10 pb-8 flex flex-col shadow-[0_-10px_40px_rgba(0,0,0,0.15)]">
-        <h2 className="text-[28px] font-bold text-[#111827] mb-1 flex items-center gap-2">
-          Olá! <span className="text-2xl">👋</span>
-        </h2>
-        <p className="text-[#6B7280] text-[15px] mb-8 font-medium">Faça seu login para continuar</p>
+        {missingFieldsData ? (
+          <>
+            <h2 className="text-[28px] font-bold text-[#111827] mb-1 flex items-center gap-2">
+              Quase lá! <span className="text-2xl">✨</span>
+            </h2>
+            <p className="text-[#6B7280] text-[15px] mb-8 font-medium">Preencha seus dados para concluir</p>
+            
+            <form onSubmit={handleCompleteRegistration} className="space-y-4">
+              <input 
+                type="text" 
+                placeholder="Nome Completo" 
+                className="w-full h-14 px-5 bg-white border border-gray-200 rounded-[20px] focus:border-[#7C5CFC] focus:ring-4 focus:ring-[#7C5CFC]/10 outline-none transition-all font-medium text-[#111827] placeholder:text-gray-400 placeholder:font-normal shadow-sm"
+                value={completeName}
+                onChange={(e) => setCompleteName(e.target.value)}
+                required
+              />
+              <input 
+                type="email" 
+                placeholder="E-mail" 
+                className="w-full h-14 px-5 bg-white border border-gray-200 rounded-[20px] focus:border-[#7C5CFC] focus:ring-4 focus:ring-[#7C5CFC]/10 outline-none transition-all font-medium text-[#111827] placeholder:text-gray-400 placeholder:font-normal shadow-sm"
+                value={completeEmail}
+                onChange={(e) => setCompleteEmail(e.target.value)}
+                required
+              />
+              <input 
+                type="tel" 
+                placeholder="Telefone / WhatsApp" 
+                className="w-full h-14 px-5 bg-white border border-gray-200 rounded-[20px] focus:border-[#7C5CFC] focus:ring-4 focus:ring-[#7C5CFC]/10 outline-none transition-all font-medium text-[#111827] placeholder:text-gray-400 placeholder:font-normal shadow-sm"
+                value={completePhone}
+                onChange={(e) => setCompletePhone(e.target.value)}
+                required
+              />
+              <input 
+                type="text" 
+                placeholder="CPF" 
+                className="w-full h-14 px-5 bg-white border border-gray-200 rounded-[20px] focus:border-[#7C5CFC] focus:ring-4 focus:ring-[#7C5CFC]/10 outline-none transition-all font-medium text-[#111827] placeholder:text-gray-400 placeholder:font-normal shadow-sm"
+                value={completeCpf}
+                onChange={(e) => setCompleteCpf(e.target.value)}
+                required
+              />
+              
+              {error && (
+                <div className="p-4 bg-red-50 text-red-600 rounded-[16px] text-[14px] font-medium border border-red-100 mb-2 shadow-sm">
+                  {error}
+                </div>
+              )}
+              
+              <button 
+                type="submit" 
+                disabled={loading}
+                className="w-full h-14 rounded-[20px] bg-gradient-to-r from-[#7C5CFC] to-[#5d3fd3] text-white font-bold text-[16px] shadow-[0_8px_20px_rgba(124,92,252,0.3)] active:scale-[0.98] transition-all flex items-center justify-center disabled:opacity-70 disabled:active:scale-100 mt-4"
+              >
+                {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : "Concluir Cadastro"}
+              </button>
+              
+              <button 
+                type="button" 
+                onClick={() => { setMissingFieldsData(null); setError(""); }}
+                className="w-full text-center text-[14px] font-bold text-gray-500 hover:text-gray-700 mt-2 p-2"
+              >
+                Voltar
+              </button>
+            </form>
+          </>
+        ) : (
+          <>
+            <h2 className="text-[28px] font-bold text-[#111827] mb-1 flex items-center gap-2">
+              Olá! <span className="text-2xl">👋</span>
+            </h2>
+            <p className="text-[#6B7280] text-[15px] mb-8 font-medium">Faça seu login para continuar</p>
 
         <form onSubmit={handleEmailLogin} className="space-y-4">
           <div className="relative">
@@ -250,6 +373,8 @@ function LoginForm({ slug }: { slug: string }) {
         <p className="text-center mt-auto pt-8 text-[14px] text-gray-500 font-medium pb-2">
           Não tem uma conta? <Link href={`/pwa/${slug}`} className="text-[#7C5CFC] font-bold hover:underline">Fale com o salão</Link>
         </p>
+        </>
+        )}
       </div>
     </div>
   )

@@ -152,7 +152,13 @@ export function AppointmentCard({ appointment, top, height, leftPercent, widthPe
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
             lineHeight: 1.2, flex: 1
           }}>
-            {appointment.client_name}
+            {isSpecial ? appointment.client_name : (
+              (() => {
+                const { resolveClientForAppointment, getAppointmentClientDisplayName } = require('@/lib/utils');
+                const client = resolveClientForAppointment(appointment, store.clients);
+                return getAppointmentClientDisplayName(appointment, client);
+              })()
+            )}
           </p>
         </div>
 

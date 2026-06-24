@@ -70,7 +70,9 @@ export function AppointmentDetailsDrawer({ appointment, employees, labels, onClo
   const { saasUser } = useTenant()
   const { ConfirmationDialog, confirm } = useConfirm()
   
-  const client = store.clients.find(c => c.id === appointment.client_id)
+  const { resolveClientForAppointment, getAppointmentClientDisplayName } = require('@/lib/utils');
+  const client = resolveClientForAppointment(appointment, store.clients);
+  const displayName = isSpecial ? appointment.client_name : getAppointmentClientDisplayName(appointment, client);
   const isFinished = ["closed", "completed", "payment_pending"].includes(appointment.status)
   const isSpecial = appointment.type === 'absence' || appointment.type === 'free' || appointment.type === 'block'
 
@@ -327,11 +329,11 @@ export function AppointmentDetailsDrawer({ appointment, employees, labels, onClo
                 color: '#fff', fontSize: '1.125rem', fontWeight: 800, flexShrink: 0,
                 boxShadow: '0 4px 12px rgba(124,92,252,0.3)',
               }}>
-                {appointment.client_name.charAt(0)}
+                {displayName.charAt(0)}
               </div>
               <div style={{ minWidth: 0, flex: 1 }}>
                 <h3 style={{ fontFamily: 'var(--font-heading)', fontSize: '1.125rem', fontWeight: 700, color: '#1e1e2d', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {appointment.client_name}
+                  {displayName}
                 </h3>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', flexWrap: 'wrap', marginTop: '0.25rem' }}>
                   <span style={{
@@ -513,7 +515,7 @@ export function AppointmentDetailsDrawer({ appointment, employees, labels, onClo
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem' }}>
                     <div>
                       <p style={{ fontSize: '0.5625rem', color: '#8b8fa7', fontWeight: 700, textTransform: 'uppercase' }}>Nome</p>
-                      <p style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#1e1e2d' }}>{appointment.client_name}</p>
+                      <p style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#1e1e2d' }}>{displayName}</p>
                     </div>
                     {client?.cpf && (
                       <div>

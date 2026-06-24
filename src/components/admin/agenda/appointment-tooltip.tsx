@@ -146,7 +146,13 @@ export function AppointmentTooltip() {
                   fontSize: '1rem', fontWeight: 800, color: '#1e1e2d',
                   overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                 }}>
-                  {currentApt.client_name}
+                  {isSpecial ? currentApt.client_name : (
+                    (() => {
+                      const { resolveClientForAppointment, getAppointmentClientDisplayName } = require('@/lib/utils');
+                      const resolvedClient = resolveClientForAppointment(currentApt, store.clients);
+                      return getAppointmentClientDisplayName(currentApt, resolvedClient);
+                    })()
+                  )}
                 </p>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', flexWrap: 'wrap' }}>
                   <span style={{

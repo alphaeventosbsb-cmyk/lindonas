@@ -361,3 +361,81 @@ export function checkAppointmentConflict(
   return { hasConflict: false, type: null, conflict: null }
 }
 
+export function isPhoneNumberOnly(text: string | null | undefined): boolean {
+  if (!text) return false;
+  const digits = text.replace(/\D/g, "");
+  const letters = text.replace(/[^a-zA-ZÀ-ÿ]/g, "");
+  // Se tiver pelo menos 8 dígitos e menos que 3 letras, provavelmente é telefone
+  if (digits.length >= 8 && letters.length < 3) return true;
+  return false;
+}
+
+export function resolveClientForAppointment(appointment: any, clients: any[]): any {
+  if (!clients || !Array.isArray(clients)) return null;
+
+  // 1. Tentar por client_id
+  let client = null;
+  if (appointment.client_id) {
+    client = clients.find(c => c.id === appointment.client_id);
+    if (client) return client;
+  }
+
+  // Se o agendamento já tiver o client resolvido e for o objeto inteiro:
+  if (appointment.client && typeof appointment.client === 'object' && appointment.client.id) {
+    return appointment.client;
+  }
+
+  // 2. Tentar por telefone normalizado
+  if (!client && appointment.client_phone) {
+    const aptPhone = appointment.client_phone.replace(/\D/g, "");
+    if (aptPhone.length >= 10) {
+      const matches = clients.filter(c => c.phone && c.phone.replace(/\D/g, "") === aptPhone);
+      if (matches.length === 1) return matches[0];
+    }
+  }
+
+  // 2.1 Tentar por telefone no campo de nome, caso tenha sido salvo errado
+  if (!client && appointment.client_name && isPhoneNumberOnly(appointment.client_name)) {
+    const aptPhone = appointment.client_name.replace(/\D/g, "");
+    if (aptPhone.length >= 10) {
+      const matches = clients.filter(c => c.phone && c.phone.replace(/\D/g, "") === aptPhone);
+      if (matches.length === 1) return matches[0];
+    }
+  }
+
+  // 3. Tentar por email
+  if (!client && appointment.client_email) {
+    const matches = clients.filter(c => c.email && c.email.trim().toLowerCase() === appointment.client_email.trim().toLowerCase());
+    if (matches.length === 1) return matches[0];
+  }
+
+  // 4. Tentar por nome exato (último recurso)
+  if (!client && appointment.client_name && !isPhoneNumberOnly(appointment.client_name)) {
+    const matches = clients.filter(c => c.name && c.name.trim().toLowerCase() === appointment.client_name.trim().toLowerCase());
+    if (matches.length === 1) return matches[0];
+  }
+
+  return null;
+}
+
+export function getAppointmentClientDisplayName(appointment: any, client: any): string {
+  // 1. Se existe cliente e tem nome válido, usar.
+  if (client && client.name && !isPhoneNumberOnly(client.name)) {
+    return client.name;
+  }
+
+  // 2. Se não tem cliente ou o nome do cliente é telefone, checar o nome no agendamento.
+  if (appointment && appointment.client_name) {
+    if (isPhoneNumberOnly(appointment.client_name)) {
+      return client?.name || "Cliente sem nome";
+    }
+    return appointment.client_name;
+  }
+
+  // Fallback extremo
+  if (client && client.name) return client.name;
+  if (appointment && appointment.client_phone) return appointment.client_phone;
+  if (client && client.phone) return client.phone;
+
+  return "Cliente não informado";
+}

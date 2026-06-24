@@ -92,7 +92,7 @@ export function AppointmentCard({ appointment, top, height, leftPercent, widthPe
         width: activeWidth,
         height: `${height - 2}px`,
         borderRadius: '0.5rem',
-        overflow: isHovered ? 'visible' : 'hidden',
+        overflow: 'hidden',
         cursor: 'pointer',
         zIndex: isDragging ? 50 : (isHovered ? 9999 : 3),
         transition: 'box-shadow 0.2s, transform 0.2s, width 0.2s, background 0.2s, border 0.2s',
@@ -131,9 +131,10 @@ export function AppointmentCard({ appointment, top, height, leftPercent, widthPe
         height: '100%', display: 'flex', flexDirection: 'column',
         justifyContent: isCompact ? 'center' : 'flex-start',
         gap: '0.125rem',
+        overflow: 'hidden', width: '100%', boxSizing: 'border-box'
       }}>
         {/* Row 1: Client name or Event title (HEADER) */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', minWidth: 0, overflow: 'hidden' }}>
           {(isAbsence || isFree) && (
             <span style={{
               fontSize: '0.5rem', fontWeight: 800, padding: '0.0625rem 0.25rem',
@@ -160,7 +161,8 @@ export function AppointmentCard({ appointment, top, height, leftPercent, widthPe
           <div style={{ 
             display: 'flex', alignItems: 'center', gap: '0.25rem', 
             flexWrap: 'nowrap', overflow: 'hidden', 
-            marginTop: isCompact ? 0 : '0.125rem' 
+            marginTop: isCompact ? 0 : '0.125rem',
+            minWidth: 0
           }}>
             <span style={{
               fontSize: '0.5rem', fontWeight: 700, padding: '0.0625rem 0.375rem',
@@ -191,15 +193,16 @@ export function AppointmentCard({ appointment, top, height, leftPercent, widthPe
         )}
 
         {/* Row 3: Time + Price */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.25rem', marginTop: '0.25rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.25rem', marginTop: '0.25rem', minWidth: 0, overflow: 'hidden' }}>
           <span style={{
             fontSize: isCompact ? '0.625rem' : '0.6875rem', fontWeight: 800,
             color: dot, fontFamily: 'var(--font-heading)',
+            flexShrink: 0
           }}>
             {appointment.appointment_time}
           </span>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', flexShrink: 1, minWidth: 0, overflow: 'hidden' }}>
             {/* Payment icon */}
             {!isSpecial && appointment.status === 'closed' ? (
               <span style={{ fontSize: '0.5rem', fontWeight: 800, color: '#047857', background: '#a7f3d0', padding: '0.125rem 0.25rem', borderRadius: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.125rem' }}>
@@ -214,6 +217,7 @@ export function AppointmentCard({ appointment, top, height, leftPercent, widthPe
             {!isSpecial && (
               <span style={{
                 fontSize: '0.5625rem', fontWeight: 800, color: '#7c5cfc',
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
               }}>
                 {formatCurrency(appointment.service_price)}
               </span>
@@ -223,7 +227,7 @@ export function AppointmentCard({ appointment, top, height, leftPercent, widthPe
 
         {/* Row 4 & 5: Service & Duration */}
         {!isCompact && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.125rem', marginTop: '0.125rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.125rem', marginTop: '0.125rem', minWidth: 0, overflow: 'hidden' }}>
             <p style={{
               fontSize: '0.5625rem', color: service?.color_hex || '#4b5563', fontWeight: service?.color_hex ? 700 : 500,
               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
@@ -242,7 +246,7 @@ export function AppointmentCard({ appointment, top, height, leftPercent, widthPe
             </p>
             
             {!isSpecial && appointment.end_time && (
-              <p style={{ fontSize: '0.5625rem', color: '#6b7280', fontWeight: 600, lineHeight: 1.2 }}>
+              <p style={{ fontSize: '0.5625rem', color: '#6b7280', fontWeight: 600, lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {appointment.appointment_time} → {appointment.end_time} • {appointment.duration_minutes}min
               </p>
             )}
@@ -251,7 +255,7 @@ export function AppointmentCard({ appointment, top, height, leftPercent, widthPe
 
         {/* Row 6: Labels (if space) */}
         {!isCompact && labels.length > 0 && height > 110 && (
-          <div style={{ display: 'flex', gap: '0.125rem', flexWrap: 'wrap', marginTop: '0.125rem' }}>
+          <div style={{ display: 'flex', gap: '0.125rem', flexWrap: 'nowrap', marginTop: '0.125rem', overflow: 'hidden', minWidth: 0 }}>
             {labels.slice(0, 2).map(l => (
               <span key={l.id} style={{
                 fontSize: '0.5rem', fontWeight: 700,

@@ -33,10 +33,10 @@ export function CloseAccountModal({ appointment, onClose, onDone }: Props) {
   const { saasUser } = useTenant()
   const { can } = usePermission()
   
-  const [paymentSplits, setPaymentSplits] = useState<{ method: string, amount: string }[]>(
-    appointment.payment_splits?.map(s => ({ method: s.method, amount: s.amount != null ? String(s.amount) : "" })) || 
+  const [paymentSplits, setPaymentSplits] = useState<{ method: string, amount: string, manuallyEdited?: boolean }[]>(
+    appointment.payment_splits?.map(s => ({ method: s.method, amount: s.amount != null ? String(s.amount) : "", manuallyEdited: true })) || 
     (appointment.payment_method && appointment.payment_method !== "multiple" && appointment.payment_method !== "mixed" 
-      ? [{ method: appointment.payment_method, amount: appointment.payment_status === "paid" || appointment.payment_status === "partial" ? (appointment.payment_splits?.[0]?.amount != null ? String(appointment.payment_splits[0].amount) : "") : "" }] 
+      ? [{ method: appointment.payment_method, amount: appointment.payment_status === "paid" || appointment.payment_status === "partial" ? (appointment.payment_splits?.[0]?.amount != null ? String(appointment.payment_splits[0].amount) : "") : "", manuallyEdited: true }] 
       : [])
   )
 
@@ -183,18 +183,52 @@ export function CloseAccountModal({ appointment, onClose, onDone }: Props) {
   const restante = diff < 0 && !isCourtesy ? Math.abs(diff) : 0
   const dynamicStatus = valorTotalPago === 0 ? "pending" : (valorTotalPago < total ? "partial" : "paid")
 
-  const handleToggleMethod = (m: string) => {
-    if (paymentSplits.find(s => s.method === m)) {
-      setPaymentSplits(paymentSplits.filter(s => s.method !== m))
-    } else {
-      const isFirst = paymentSplits.length === 0
-      const initialAmount = isFirst ? remainingToPay.toFixed(2).replace(".", ",") : ""
-      setPaymentSplits([...paymentSplits, { method: m, amount: initialAmount }])
+  const recalculateSplits = (newSplits: { method: string, amount: string, manuallyEdited?: boolean }[], totalToPay: number) => {
+    if (newSplits.length === 0) return newSplits
+    
+    const manualSum = newSplits.filter(s => s.manuallyEdited).reduce((acc, s) => acc + (Number(String(s.amount || "").replace(",", ".")) || 0), 0)
+    const remaining = Math.max(0, totalToPay - manualSum)
+    
+    const nonManual = newSplits.filter(s => !s.manuallyEdited)
+    
+    if (newSplits.length === 1 && nonManual.length === 1) {
+       return [{ ...newSplits[0], amount: totalToPay > 0 ? totalToPay.toFixed(2).replace(".", ",") : "" }]
     }
+    
+    if (nonManual.length > 0) {
+      return newSplits.map(s => {
+        if (s.manuallyEdited) return s
+        if (s.method === nonManual[nonManual.length - 1].method) {
+           return { ...s, amount: remaining > 0 ? remaining.toFixed(2).replace(".", ",") : "0,00" }
+        } else {
+           return { ...s, amount: "0,00" }
+        }
+      })
+    }
+    return newSplits
+  }
+
+  useEffect(() => {
+    setPaymentSplits(prev => {
+      const recalc = recalculateSplits(prev, remainingToPay)
+      if (JSON.stringify(prev) !== JSON.stringify(recalc)) return recalc
+      return prev
+    })
+  }, [remainingToPay])
+
+  const handleToggleMethod = (m: string) => {
+    let newSplits = [...paymentSplits]
+    if (newSplits.find(s => s.method === m)) {
+      newSplits = newSplits.filter(s => s.method !== m)
+    } else {
+      newSplits.push({ method: m, amount: "", manuallyEdited: false })
+    }
+    setPaymentSplits(recalculateSplits(newSplits, remainingToPay))
   }
 
   const handleSplitAmountChange = (m: string, val: string) => {
-    setPaymentSplits(paymentSplits.map(s => s.method === m ? { ...s, amount: val } : s))
+    let newSplits = paymentSplits.map(s => s.method === m ? { ...s, amount: val, manuallyEdited: val !== "" } : s)
+    setPaymentSplits(recalculateSplits(newSplits, remainingToPay))
   }
 
   const handleSubmit = async (asPending: boolean) => {

@@ -449,6 +449,7 @@ export function NewAppointmentModal({ onClose, onDone, prefill, editMode }: Prop
         if (selectedService !== prefill.service_id) {
           updateData.service_id = selectedService
           updateData.service_name = svc?.name || ""
+          updateData.commission_base_amount = svc?.commission_base_amount || null
           logParts.push(`Serviço alterado de "${prefill.service_name}" para "${svc?.name || ''}"`)
         }
         if (selectedEmployee !== (prefill.employee_id || "")) {
@@ -526,6 +527,7 @@ export function NewAppointmentModal({ onClose, onDone, prefill, editMode }: Prop
       let serviceTotalValue: number | null = null;
       let professionalServiceValue: number | null = null;
       let isSharedService: boolean | null = null;
+      let finalCommissionBaseAmount: number | null = svc?.commission_base_amount || null;
 
       const validAssistants = assistants.filter(a => a !== "")
       
@@ -536,6 +538,9 @@ export function NewAppointmentModal({ onClose, onDone, prefill, editMode }: Prop
         serviceTotalValue = price || 0;
         professionalServiceValue = (price || 0) / totalProfessionals;
         isSharedService = true;
+        if (svc?.commission_base_amount) {
+          finalCommissionBaseAmount = svc.commission_base_amount / totalProfessionals;
+        }
       } else if (isSharedDuplication && prefill?.id) {
         sharedGroupId = prefill.shared_group_id || prefill.id;
         
@@ -550,6 +555,9 @@ export function NewAppointmentModal({ onClose, onDone, prefill, editMode }: Prop
         serviceTotalValue = price || 0;
         professionalServiceValue = (price || 0) / totalProfessionals;
         isSharedService = true;
+        if (svc?.commission_base_amount) {
+          finalCommissionBaseAmount = svc.commission_base_amount / totalProfessionals;
+        }
 
         try {
           // Update all original appointments in the group
@@ -560,6 +568,7 @@ export function NewAppointmentModal({ onClose, onDone, prefill, editMode }: Prop
               service_total_value: serviceTotalValue,
               professional_service_value: professionalServiceValue,
               service_price: finalServicePrice,
+              commission_base_amount: finalCommissionBaseAmount,
               updated_at: new Date().toISOString()
             })
           }
@@ -577,6 +586,7 @@ export function NewAppointmentModal({ onClose, onDone, prefill, editMode }: Prop
         service_id: selectedService,
         service_name: svc?.name || "",
         service_price: finalServicePrice,
+        commission_base_amount: finalCommissionBaseAmount,
         is_shared_service: isSharedService || null,
         shared_group_id: sharedGroupId,
         service_total_value: serviceTotalValue,
@@ -647,6 +657,7 @@ export function NewAppointmentModal({ onClose, onDone, prefill, editMode }: Prop
             service_id: selectedService,
             service_name: svc?.name || "",
             service_price: finalServicePrice,
+            commission_base_amount: finalCommissionBaseAmount,
             is_shared_service: true,
             shared_group_id: sharedGroupId,
             service_total_value: serviceTotalValue,

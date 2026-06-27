@@ -36,6 +36,7 @@ export function ServiceFormModal({ service, categories, allServices, allProducts
     category_id: service?.category_id || "",
     standard_service_id: service?.standard_service_id || "",
     price: service?.price !== undefined ? String(service.price) : "",
+    commission_base_amount: service?.commission_base_amount !== null && service?.commission_base_amount !== undefined ? String(service.commission_base_amount) : "",
     price_type: service?.price_type || "fixed",
     duration_minutes: service?.duration_minutes || 60,
     is_active: service ? service.is_active : true,
@@ -141,6 +142,7 @@ export function ServiceFormModal({ service, categories, allServices, allProducts
         category_id: form.category_id || null,
         standard_service_id: form.standard_service_id || null,
         price: parseFloat(form.price),
+        commission_base_amount: form.commission_base_amount ? parseFloat(form.commission_base_amount) : null,
         price_type: form.price_type || null,
         duration_minutes: parseInt(String(form.duration_minutes), 10) || 60,
         is_active: form.is_active,
@@ -231,7 +233,7 @@ export function ServiceFormModal({ service, categories, allServices, allProducts
                 <textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value.slice(0, 450) })} style={{ ...inputStyle, minHeight: '80px', resize: 'vertical' }} placeholder="Descreva os detalhes deste serviço..." />
               </div>
 
-              <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: '0.75rem', border: '1px solid #e2e8f0', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+              <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: '0.75rem', border: '1px solid #e2e8f0', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '1rem' }}>
                 <div>
                   <label style={labelStyle}>Tipo de Preço</label>
                   <select value={form.price_type} onChange={e => setForm({ ...form, price_type: e.target.value as any })} style={inputStyle}>
@@ -242,6 +244,10 @@ export function ServiceFormModal({ service, categories, allServices, allProducts
                 <div>
                   <label style={labelStyle}>Preço Padrão (R$) *</label>
                   <input type="number" step="0.01" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} style={inputStyle} placeholder="0.00" />
+                </div>
+                <div>
+                  <label style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: '4px' }}>Base Comissão (R$) <span title="Valor base para cálculo de comissão (se houver taxa de cartão, informe o valor à vista)" style={{ cursor: 'help', color: '#9ca3af' }}>ℹ️</span></label>
+                  <input type="number" step="0.01" value={form.commission_base_amount} onChange={e => setForm({ ...form, commission_base_amount: e.target.value })} style={inputStyle} placeholder="Opcional" />
                 </div>
                 <div>
                   <label style={labelStyle}>Duração (min) *</label>

@@ -640,6 +640,18 @@ export function AppointmentDetailsDrawer({ appointment, employees, labels, onClo
                         <span style={{ fontSize: '0.75rem', color: '#8b8fa7' }}>Valor do Serviço</span>
                         <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#1e1e2d' }}>{formatCurrency(appointment.service_price)}</span>
                       </div>
+                      {appointment.commission_base_amount !== undefined && appointment.commission_base_amount !== null && appointment.commission_base_amount < appointment.service_price && (
+                        <>
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ fontSize: '0.75rem', color: '#8b8fa7' }}>Base Comissão</span>
+                            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#1e1e2d' }}>{formatCurrency(appointment.commission_base_amount)}</span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ fontSize: '0.75rem', color: '#8b8fa7' }}>Taxa Não Comissionável</span>
+                            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#1e1e2d' }}>{formatCurrency(appointment.service_price - appointment.commission_base_amount)}</span>
+                          </div>
+                        </>
+                      )}
                       <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #f1f3f9', paddingTop: '0.375rem', marginTop: '0.125rem' }}>
                         <span style={{ fontSize: '0.75rem', color: '#8b8fa7', fontWeight: 700 }}>Total Pago</span>
                         <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#059669' }}>{formatCurrency(appointment.service_price)}</span>

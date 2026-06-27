@@ -496,7 +496,8 @@ export function CloseAccountModal({ appointment, onClose, onDone }: Props) {
 
           const commPercent = getEmployeeComm(apt.employee_id)
           const baseServiceValue = sharedValues[apt.id] !== undefined ? sharedValues[apt.id] : (apt.professional_service_value || apt.service_price || 0)
-          const valueAfterDiscount = Math.max(0, baseServiceValue - (baseServiceValue * discountRatio))
+          const baseValue = apt.commission_base_amount !== undefined && apt.commission_base_amount !== null ? apt.commission_base_amount : baseServiceValue
+          const valueAfterDiscount = Math.max(0, baseValue - (baseValue * discountRatio))
           const commAmount = valueAfterDiscount * (commPercent / 100)
 
           await createDocument("commissions", {
@@ -510,7 +511,7 @@ export function CloseAccountModal({ appointment, onClose, onDone }: Props) {
             service_name_snapshot: apt.service_name || "",
             professional_name_snapshot: apt.employee_name || "",
             client_name_snapshot: apt.client_name || "",
-            service_amount: baseServiceValue,
+            service_amount: baseValue,
             paid_amount: valueAfterDiscount,
             commission_percentage: commPercent,
             commission_amount: commAmount,
@@ -524,7 +525,9 @@ export function CloseAccountModal({ appointment, onClose, onDone }: Props) {
           const existingComms = await fetchCollectionWhere<Commission>("commissions", "appointment_id", "==", appointment.id)
           if (existingComms.length === 0) {
             const commPercent = getEmployeeComm(appointment.employee_id)
-            const valueAfterDiscount = Math.max(0, price - discount)
+            const baseValue = appointment.commission_base_amount !== undefined && appointment.commission_base_amount !== null ? appointment.commission_base_amount : price
+            const discountRatio = price > 0 ? discount / price : 0
+            const valueAfterDiscount = Math.max(0, baseValue - (baseValue * discountRatio))
             const commAmount = valueAfterDiscount * (commPercent / 100)
 
             await createDocument("commissions", {
@@ -538,7 +541,7 @@ export function CloseAccountModal({ appointment, onClose, onDone }: Props) {
               service_name_snapshot: appointment.service_name || "",
               professional_name_snapshot: appointment.employee_name || "",
               client_name_snapshot: appointment.client_name || "",
-              service_amount: price,
+              service_amount: baseValue,
               paid_amount: valueAfterDiscount,
               commission_percentage: commPercent,
               commission_amount: commAmount,

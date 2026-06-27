@@ -113,6 +113,7 @@ export interface Service {
   description: string | null
   service_code: string | null
   price: number
+  commission_base_amount?: number | null // Valor base para comissão (se houver taxa de cartão, esse é o valor menor)
   promotional_price: number | null
   price_type: "fixed" | "starting_at" | null
   product_average_cost: number | null
@@ -358,6 +359,8 @@ export interface Appointment {
   shared_group_id?: string | null
   service_total_value?: number | null
   professional_service_value?: number | null
+  commission_base_amount?: number | null
+  non_commission_fee_amount?: number | null
   type?: "appointment" | "absence" | "free" | "block"
   source?: string
   created_at: string

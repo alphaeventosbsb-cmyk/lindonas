@@ -276,6 +276,7 @@ function RevenueModalContent({ commissions, defaultStart, defaultEnd }: { commis
     const periodComms = commissions.filter(c => {
       if (localStart && c.performed_at < localStart) return false
       if (localEnd && c.performed_at > localEnd) return false
+      if (c.status === "cancelled") return false
       return true
     })
 

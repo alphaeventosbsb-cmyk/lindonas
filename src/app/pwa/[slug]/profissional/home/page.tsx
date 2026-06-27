@@ -10,6 +10,7 @@ import { ptBR } from "date-fns/locale"
 import { getAuthInstance } from "@/lib/firebase/config"
 import { getDb } from "@/lib/firebase/config"
 import { collection, query, where, getDocs } from "firebase/firestore"
+import { isCommissionableAppointment } from "@/lib/commission-utils"
 
 import { PwaHeader } from "@/components/pwa/ui/pwa-header"
 import { PwaCard } from "@/components/pwa/ui/pwa-card"
@@ -72,7 +73,7 @@ export default function ProfessionalHome() {
     (a.status === "scheduled" || a.status === "pending" || a.status === "confirmed") && isAfter(parseISO(`${a.date?.split('T')[0] || a.appointment_date}T${a.start_time || a.appointment_time}:00`), new Date())
   )
 
-  const completedAppts = todayAppointments.filter(a => a.status === "completed")
+  const completedAppts = todayAppointments.filter(a => isCommissionableAppointment(a.status))
   const totalCommissions = completedAppts.reduce((acc, curr) => acc + (curr.commission_amount || 0), 0)
 
   const firstName = employee?.name?.split(' ')[0] || user?.displayName?.split(' ')[0] || "Profissional"

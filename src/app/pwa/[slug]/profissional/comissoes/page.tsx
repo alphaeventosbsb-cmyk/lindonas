@@ -9,6 +9,7 @@ import { ptBR } from "date-fns/locale"
 import { getDb } from "@/lib/firebase/config"
 import { collection, query, where, getDocs } from "firebase/firestore"
 import { useRouter } from "next/navigation"
+import { isCommissionableAppointment } from "@/lib/commission-utils"
 
 import { PwaCard } from "@/components/pwa/ui/pwa-card"
 import { PwaEmptyState } from "@/components/pwa/ui/pwa-empty-state"
@@ -43,13 +44,13 @@ export default function ProfessionalCommissions() {
         const q = query(
           apptsRef,
           where("company_id", "==", companyId),
-          where("employee_id", "==", currentEmp.id),
-          where("status", "==", "completed")
+          where("employee_id", "==", currentEmp.id)
         )
         const snap = await getDocs(q)
         let appts = snap.docs.map(d => ({ id: d.id, ...d.data() }))
         
         appts = appts.filter((a: any) => {
+          if (!isCommissionableAppointment(a.status)) return false;
           const dt = parseISO(a.date || a.appointment_date)
           return dt >= startOfMonth(selectedMonth) && dt <= endOfMonth(selectedMonth)
         })

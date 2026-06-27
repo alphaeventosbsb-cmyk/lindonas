@@ -74,6 +74,7 @@ export default function PagamentosPage() {
           if (c.professional_id !== emp.id) return false
           if (periodStart && c.performed_at < periodStart) return false
           if (periodEnd && c.performed_at > periodEnd) return false
+          if (c.status === "cancelled") return false
           return true
         })
         hasPending = empComms.some(c => c.status === "pending" && c.commission_amount > 0)
@@ -93,6 +94,7 @@ export default function PagamentosPage() {
       if (c.professional_id !== empId) return false
       if (periodStart && c.performed_at < periodStart) return false
       if (periodEnd && c.performed_at > periodEnd) return false
+      if (c.status === "cancelled") return false
       return true
     })
 
@@ -112,6 +114,7 @@ export default function PagamentosPage() {
       }
       if (periodStart && c.performed_at < periodStart) return false
       if (periodEnd && c.performed_at > periodEnd) return false
+      if (c.status === "cancelled") return false
       return true
     })
     

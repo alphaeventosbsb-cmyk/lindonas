@@ -5,6 +5,7 @@ import {
   type WhereFilterOp, type Unsubscribe
 } from "firebase/firestore"
 import type { Appointment } from "@/lib/types/database"
+import { isCommissionableAppointment, isCancelledOrNoShowStatus } from "@/lib/commission-utils"
 
 const db = () => getDb()
 
@@ -345,6 +346,48 @@ export async function updateAppointment(
     last_action_by_user_id: user?.id || null,
     last_action_by_name: user?.name || null,
     last_action_type: actionType
+  }
+  
+  if (updateData.status && isCancelledOrNoShowStatus(updateData.status)) {
+    try {
+      const apptDoc = await getDoc(doc(db(), "appointments", appointmentId));
+      if (apptDoc.exists()) {
+        const apptData = apptDoc.data();
+        const companyId = apptData.company_id;
+        
+        if (companyId) {
+          const commsQuery = query(
+            collection(db(), "commissions"),
+            where("company_id", "==", companyId),
+            where("appointment_id", "==", appointmentId)
+          );
+          const commsSnap = await getDocs(commsQuery);
+          const commissionsToCancel = commsSnap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
+      for (const comm of commissionsToCancel) {
+        if (comm.status === "pending") {
+          await updateDocument("commissions", comm.id, {
+            status: "cancelled",
+            commission_adjustment_reason: "Agendamento cancelado/faltou",
+            updated_at: new Date().toISOString()
+          });
+          import("@/lib/firebase/client-utils").then(({ createAuditLog }) => {
+            createAuditLog("commissions", "cancelled", "Comissão pendente cancelada pois agendamento foi marcado como cancelado/faltou.", user, { commission_id: comm.id, appointment_id: appointmentId });
+          });
+        } else if (comm.status === "paid") {
+          await updateDocument("commissions", comm.id, {
+            commission_adjustment_reason: "Atenção: Agendamento cancelado/faltou após comissão ser paga (necessita ajuste)",
+            updated_at: new Date().toISOString()
+          });
+          import("@/lib/firebase/client-utils").then(({ createAuditLog }) => {
+            createAuditLog("commissions", "requires_adjustment", "Agendamento cancelado/faltou após comissão ser paga. Ajuste pode ser necessário.", user, { commission_id: comm.id, appointment_id: appointmentId });
+          });
+        }
+        }
+        }
+      }
+    } catch (err) {
+      console.error("Erro ao processar comissões em agendamento cancelado/faltou: ", err);
+    }
   }
   
   const result = await updateDocument("appointments", appointmentId, enhancedData)

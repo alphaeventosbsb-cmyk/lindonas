@@ -10,6 +10,7 @@ import { toast } from "sonner"
 import { usePermission } from "@/lib/rbac/usePermission"
 import { PermissionGate } from "@/components/ui/permission-gate"
 import { createHistoryEvent } from "@/lib/firebase/history-service"
+import { isCommissionableAppointment, isCancelledOrNoShowStatus } from "@/lib/commission-utils"
 
 interface Props { appointment: Appointment; onClose: () => void; onDone: () => void }
 
@@ -483,9 +484,13 @@ export function CloseAccountModal({ appointment, onClose, onDone }: Props) {
 
       const discountRatio = price > 0 ? discount / price : 0
 
-      if (appointment.is_shared_service && appointment.shared_group_id) {
-        for (const apt of sharedAppointments) {
-          if (!apt.employee_id) continue
+      // Only generate if final appointment status is commissionable and it wasn't cancelled before
+      const finalAppointmentStatus = asPending ? appointment.status : "closed"
+      
+      if (isCommissionableAppointment(finalAppointmentStatus) && !isCancelledOrNoShowStatus(appointment.status)) {
+        if (appointment.is_shared_service && appointment.shared_group_id) {
+          for (const apt of sharedAppointments) {
+            if (!apt.employee_id) continue
           const existingComms = await fetchCollectionWhere<Commission>("commissions", "appointment_id", "==", apt.id)
           if (existingComms.length > 0) continue // Skip if already generated
 
@@ -544,6 +549,7 @@ export function CloseAccountModal({ appointment, onClose, onDone }: Props) {
           }
         }
       }
+    }
 
       // 3. Auto-create or update client & Generate Credit/Debit
       await autoCreateOrUpdateClient(appointment, finalPaidExterno, finalPayStatus, asPending ? total : restante, excedente, finalPaidCredit)

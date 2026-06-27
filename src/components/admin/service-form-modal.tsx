@@ -233,7 +233,7 @@ export function ServiceFormModal({ service, categories, allServices, allProducts
                 <textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value.slice(0, 450) })} style={{ ...inputStyle, minHeight: '80px', resize: 'vertical' }} placeholder="Descreva os detalhes deste serviço..." />
               </div>
 
-              <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: '0.75rem', border: '1px solid #e2e8f0', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '1rem' }}>
+              <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: '0.75rem', border: '1px solid #e2e8f0', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div>
                   <label style={labelStyle}>Tipo de Preço</label>
                   <select value={form.price_type} onChange={e => setForm({ ...form, price_type: e.target.value as any })} style={inputStyle}>

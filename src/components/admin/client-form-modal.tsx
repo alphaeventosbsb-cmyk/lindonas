@@ -165,6 +165,19 @@ export function ClientFormModal({ client, onClose, onSave }: Props) {
     if (!name.trim()) { toast.error("Nome é obrigatório"); return }
     if (!phone.trim()) { toast.error("Telefone é obrigatório"); return }
 
+    // Required fields for NEW clients only (existing clients are not affected)
+    if (!client) {
+      const missing: string[] = []
+      if (!cpf.replace(/\D/g, "")) missing.push("CPF")
+      if (!rg.trim()) missing.push("RG")
+      if (!email.trim()) missing.push("E-mail")
+      if (!birthDate) missing.push("Data de nascimento")
+      if (missing.length > 0) {
+        toast.error(`Preencha os campos obrigatórios: ${missing.join(", ")}`)
+        return
+      }
+    }
+
     const cleanCpf = cpf.replace(/\D/g, "")
     if (cleanCpf && cleanCpf.length === 11 && !validateCPF(cleanCpf)) {
       toast.error("CPF inválido"); return

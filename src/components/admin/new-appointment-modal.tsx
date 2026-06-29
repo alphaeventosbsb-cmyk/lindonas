@@ -40,6 +40,7 @@ export function NewAppointmentModal({ onClose, onDone, prefill, editMode }: Prop
   const [clientSearch, setClientSearch] = useState("")
   const [selectedClient, setSelectedClient] = useState<Client | null>(null)
   const [showNewClient, setShowNewClient] = useState(false)
+  const [showUpdateClient, setShowUpdateClient] = useState(false)
   const [showClientHistory, setShowClientHistory] = useState(false)
   const [selectedService, setSelectedService] = useState("")
   const [serviceSearch, setServiceSearch] = useState("")
@@ -314,6 +315,20 @@ export function NewAppointmentModal({ onClose, onDone, prefill, editMode }: Prop
     if (!clientPhone || clientPhone.length < 10) { toast.error("Telefone inválido"); return }
     if (!selectedService) { toast.error("Selecione o serviço"); return }
     if (!time) { toast.error("Informe o horário"); return }
+
+    // Check if existing client has incomplete required data
+    if (selectedClient) {
+      const missingFields: string[] = []
+      if (!selectedClient.cpf?.replace(/\D/g, "")) missingFields.push("CPF")
+      if (!(selectedClient as any).rg?.trim()) missingFields.push("RG")
+      if (!selectedClient.email?.trim()) missingFields.push("E-mail")
+      if (!(selectedClient as any).birth_date) missingFields.push("Data de nascimento")
+      if (missingFields.length > 0) {
+        toast.error(`O cliente ${selectedClient.name} precisa atualizar: ${missingFields.join(", ")}`)
+        setShowUpdateClient(true)
+        return
+      }
+    }
 
     const emp = employees.find(e => e.id === selectedEmployee) || null
     
@@ -1167,6 +1182,29 @@ export function NewAppointmentModal({ onClose, onDone, prefill, editMode }: Prop
           client={null}
           onClose={() => setShowNewClient(false)}
           onSave={handleSaveClient}
+        />
+      )}
+
+      {showUpdateClient && selectedClient && (
+        <ClientFormModal
+          client={selectedClient}
+          onClose={() => setShowUpdateClient(false)}
+          onSave={async (data, photoFile, oldPhotoUrl) => {
+            try {
+              let photoUrl = data.photo_url || selectedClient.photo_url || null
+              if (photoFile) {
+                photoUrl = await uploadToCloudinary(photoFile, "salao/clientes")
+              }
+              const saveData = { ...data, photo_url: photoUrl }
+              await updateDocument("clients", selectedClient.id, saveData)
+              setSelectedClient({ ...selectedClient, ...saveData } as Client)
+              setShowUpdateClient(false)
+              toast.success("Dados do cliente atualizados!")
+            } catch (err) {
+              toast.error(err instanceof Error ? err.message : "Erro ao atualizar cliente")
+              throw err
+            }
+          }}
         />
       )}
       

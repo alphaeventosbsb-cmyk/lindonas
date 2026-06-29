@@ -253,14 +253,68 @@ export default function AgendaPage() {
       return
     }
 
+    // Confirmation before delete
+    const isBlock = apt?.type === 'block'
+    const dateFormatted = apt?.appointment_date ? new Date(apt.appointment_date + "T12:00:00").toLocaleDateString('pt-BR') : ''
+    
+    // Check for linked commissions (only for real appointments, not blocks)
+    let linkedCommissions: any[] = []
+    if (!isBlock && id) {
+      try {
+        linkedCommissions = await fetchCollectionWhere("commissions", "appointment_id", "==", id)
+      } catch { linkedCommissions = [] }
+    }
+    const pendingComms = linkedCommissions.filter(c => c.status === "pending")
+    const paidComms = linkedCommissions.filter(c => c.status === "paid")
+
+    let details = isBlock
+      ? `Bloqueio: ${apt?.appointment_time || ''} - ${apt?.end_time || ''}\nProfissional: ${apt?.employee_name || '-'}\nData: ${dateFormatted}`
+      : `Cliente: ${apt?.client_name || '-'}\nServiço: ${apt?.service_name || '-'}\nProfissional: ${apt?.employee_name || '-'}\nData: ${dateFormatted}\nHorário: ${apt?.appointment_time || '-'}`
+    
+    if (pendingComms.length > 0) {
+      details += `\n\n⚠ ${pendingComms.length} comissão(ões) pendente(s) vinculada(s) a este agendamento também será(ão) cancelada(s).`
+    }
+    if (paidComms.length > 0) {
+      details += `\n\n⚠ Este agendamento possui ${paidComms.length} comissão(ões) já paga(s)/acertada(s). Verifique a necessidade de ajuste manual.`
+    }
+
+    const confirmed = await confirm({
+      title: isBlock ? "Excluir bloqueio?" : "Excluir agendamento?",
+      message: `${details}\n\nEssa ação não poderá ser desfeita.`,
+      confirmText: "Sim, excluir",
+      cancelText: "Cancelar",
+      variant: "danger",
+    })
+    if (!confirmed) return
+
     try {
-      if (apt?.type === 'block') {
+      // Cancel linked commissions
+      if (linkedCommissions.length > 0) {
+        for (const comm of linkedCommissions) {
+          if (comm.status === "pending") {
+            await updateDocument("commissions", comm.id, {
+              status: "cancelled",
+              commission_adjustment_reason: "Agendamento excluído",
+              commission_adjusted_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            })
+          } else if (comm.status === "paid") {
+            // Don't delete paid commissions — just mark the reason
+            await updateDocument("commissions", comm.id, {
+              commission_adjustment_reason: (comm.commission_adjustment_reason ? comm.commission_adjustment_reason + " | " : "") + "Agendamento excluído — requer ajuste manual",
+              updated_at: new Date().toISOString(),
+            })
+          }
+        }
+      }
+
+      if (isBlock) {
         await deleteAppointment(id, saasUser, {
           professional_id: apt.employee_id || undefined,
           professional_name: apt.employee_name || undefined,
           action_type: "unblock",
           action_title: "Liberação de Horário",
-          action_description: `${saasUser?.name || 'Sistema'} removeu o bloqueio do horário ${apt.appointment_time} às ${apt.end_time || '-'} para a profissional ${apt.employee_name} no dia ${new Date(apt.appointment_date + "T12:00:00").toLocaleDateString('pt-BR')}.`,
+          action_description: `${saasUser?.name || 'Sistema'} removeu o bloqueio do horário ${apt.appointment_time} às ${apt.end_time || '-'} para a profissional ${apt.employee_name} no dia ${dateFormatted}.`,
         })
         toast.success("Bloqueio removido com sucesso")
       } else {
@@ -272,7 +326,8 @@ export default function AgendaPage() {
           professional_id: apt?.employee_id || undefined,
           professional_name: apt?.employee_name || undefined
         })
-        toast.success("Agendamento excluído com sucesso")
+        const commMsg = pendingComms.length > 0 ? ` (${pendingComms.length} comissão(ões) cancelada(s))` : ""
+        toast.success(`Agendamento excluído com sucesso${commMsg}`)
       }
       store.setSelectedAppointment(null)
     } catch (err) {
@@ -1124,6 +1179,6 @@ export default function AgendaPage() {
         />
       )}
     </div>
-    </>
-  )
+    <ConfirmationDialog />
+    </>  )
 }

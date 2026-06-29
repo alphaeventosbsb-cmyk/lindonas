@@ -97,17 +97,21 @@ export function normalizeClientFields(data: { email?: string | null, phone?: str
 }
 
 export async function checkClientDuplication(companyId: string, fields: ReturnType<typeof normalizeClientFields>, excludeClientId?: string) {
-  if (!companyId) return { hasDuplicate: false }
-  
   const { email_normalized, phone_normalized, cpf_normalized } = fields
   if (!email_normalized && !phone_normalized && !cpf_normalized) {
     return { hasDuplicate: false }
   }
 
   try {
-    const clients = await fetchCollectionWithQueries<any>("clients", [
-      { field: "company_id", operator: "==", value: companyId }
-    ])
+    // Fetch clients — if companyId is available, filter by it; otherwise fetch all (tenant-scoped DB)
+    let clients: any[]
+    if (companyId) {
+      clients = await fetchCollectionWithQueries<any>("clients", [
+        { field: "company_id", operator: "==", value: companyId }
+      ])
+    } else {
+      clients = await fetchCollection<any>("clients")
+    }
 
     for (const c of clients) {
       if (excludeClientId && c.id === excludeClientId) continue
@@ -212,16 +216,14 @@ export async function updateDocument(collectionName: string, id: string, data: a
       }
     }
     
-    if (compId) {
-      const norms = normalizeClientFields(finalData)
-      if (finalData.email !== undefined) finalData.email_normalized = norms.email_normalized
-      if (finalData.phone !== undefined) finalData.phone_normalized = norms.phone_normalized
-      if (finalData.cpf !== undefined) finalData.cpf_normalized = norms.cpf_normalized
+    const norms = normalizeClientFields(finalData)
+    if (finalData.email !== undefined) finalData.email_normalized = norms.email_normalized
+    if (finalData.phone !== undefined) finalData.phone_normalized = norms.phone_normalized
+    if (finalData.cpf !== undefined) finalData.cpf_normalized = norms.cpf_normalized
 
-      const dupCheck = await checkClientDuplication(compId, norms, id)
-      if (dupCheck.hasDuplicate) {
-        throw new Error(dupCheck.message)
-      }
+    const dupCheck = await checkClientDuplication(compId || "", norms, id)
+    if (dupCheck.hasDuplicate) {
+      throw new Error(dupCheck.message)
     }
   }
 

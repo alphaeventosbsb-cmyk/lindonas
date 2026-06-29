@@ -170,16 +170,6 @@ export function ClientFormModal({ client, onClose, onSave }: Props) {
       toast.error("CPF inválido"); return
     }
 
-    // Check CPF duplicate
-    if (cleanCpf && cleanCpf.length === 11) {
-      try {
-        const existing = await fetchCollectionWhere<Client>("clients", "cpf", "==", cleanCpf)
-        if (existing.length > 0 && (!client || existing[0].id !== client.id)) {
-          toast.error(`CPF já cadastrado para: ${existing[0].name}`); return
-        }
-      } catch { /* continue */ }
-    }
-
     const debtVal = parseFloat(debtAmount) || 0
     const data: any = {
       name: name.trim(),

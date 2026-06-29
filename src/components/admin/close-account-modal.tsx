@@ -31,8 +31,10 @@ const paymentStatuses = [
 ]
 
 export function CloseAccountModal({ appointment, onClose, onDone }: Props) {
-  const { saasUser } = useTenant()
+  const { saasUser, user, isSuperAdmin, isOwner } = useTenant()
   const { can } = usePermission()
+  const companyId = saasUser?.id || null
+  const currentUid = user?.uid || saasUser?.firebase_uid || ""
   
   const [paymentSplits, setPaymentSplits] = useState<{ method: string, amount: string, manuallyEdited?: boolean }[]>(
     appointment.payment_splits?.map(s => ({ method: s.method, amount: s.amount != null ? String(s.amount) : "", manuallyEdited: true })) || 
@@ -51,6 +53,8 @@ export function CloseAccountModal({ appointment, onClose, onDone }: Props) {
   const [creditUsed, setCreditUsed] = useState(0)
 
   const [hasOpenRegister, setHasOpenRegister] = useState<boolean | null>(null)
+  const [openCashRegisters, setOpenCashRegisters] = useState<CashRegister[]>([])
+  const [selectedCashRegisterId, setSelectedCashRegisterId] = useState<string | null>(null)
   const [loadingRegister, setLoadingRegister] = useState(true)
   const [showOpenRegister, setShowOpenRegister] = useState(false)
   const [openingAmount, setOpeningAmount] = useState("")
@@ -69,7 +73,16 @@ export function CloseAccountModal({ appointment, onClose, onDone }: Props) {
         { field: "date", operator: "==", value: today }
       ])
         .then(res => {
-          setHasOpenRegister(res.length > 0 && res[0].status === "open")
+          const openRegs = res.filter(r => r.status === "open")
+          setOpenCashRegisters(openRegs)
+          setHasOpenRegister(openRegs.length > 0)
+          // Auto-select: prefer user's own register, else first open
+          if (openRegs.length === 1) {
+            setSelectedCashRegisterId(openRegs[0].id)
+          } else if (openRegs.length > 1) {
+            const myReg = openRegs.find(r => r.opened_by_uid === currentUid || r.opened_by_user_id === saasUser?.id)
+            setSelectedCashRegisterId(myReg ? myReg.id : openRegs[0].id)
+          }
         })
         .finally(() => setLoadingRegister(false))
     } else {
@@ -241,20 +254,38 @@ export function CloseAccountModal({ appointment, onClose, onDone }: Props) {
 
     setSubmitting(true)
     try {
-      let cashRegisterId = null
+      let cashRegisterId: string | null = null
+      let cashOperatorUid: string | null = null
+      let cashOperatorName: string | null = null
+      let cashRegisterDate: string | null = null
 
       if (!asPending && !isCourtesy) {
         const activeCashRegister = await fetchCollectionWithQueries<CashRegister>("cash_registers", [
           { field: "company_id", operator: "==", value: saasUser?.id },
           { field: "date", operator: "==", value: toLocalDateStr() }
         ])
-        const openCashRegister = activeCashRegister.find(r => r.status === "open")
+        const openRegs = activeCashRegister.filter(r => r.status === "open")
         
-        if (!openCashRegister) {
+        if (openRegs.length === 0) {
           toast.error("Não existe caixa aberto para hoje. Abra o caixa antes de confirmar o pagamento.")
+          setSubmitting(false)
           return
         }
-        cashRegisterId = openCashRegister.id
+
+        let chosen: CashRegister | undefined
+        if (selectedCashRegisterId) {
+          chosen = openRegs.find(r => r.id === selectedCashRegisterId)
+        }
+        if (!chosen) {
+          chosen = openRegs.find(r => r.opened_by_uid === currentUid || r.opened_by_user_id === saasUser?.id)
+        }
+        if (!chosen) {
+          chosen = openRegs[0]
+        }
+        cashRegisterId = chosen.id
+        cashOperatorUid = chosen.opened_by_uid || chosen.opened_by_user_id || null
+        cashOperatorName = chosen.opened_by_name || null
+        cashRegisterDate = chosen.date || toLocalDateStr()
       }
 
       const finalPaymentSplits = paymentSplits.map(s => ({
@@ -380,6 +411,9 @@ export function CloseAccountModal({ appointment, onClose, onDone }: Props) {
       if (asPending || isCourtesy || total === 0) {
         const finEntry = await createDocument("financial_entries", {
           cash_register_id: cashRegisterId,
+          cash_register_date: cashRegisterDate,
+          cash_operator_uid: cashOperatorUid,
+          cash_operator_name: cashOperatorName,
           created_by_user_id: saasUser?.id || null,
           created_by_name: saasUser?.name || null,
           appointment_id: appointment.id,
@@ -412,6 +446,9 @@ export function CloseAccountModal({ appointment, onClose, onDone }: Props) {
             const split = finalPaymentSplits[i]
             const finEntry = await createDocument("financial_entries", {
               cash_register_id: cashRegisterId,
+              cash_register_date: cashRegisterDate,
+              cash_operator_uid: cashOperatorUid,
+              cash_operator_name: cashOperatorName,
               created_by_user_id: saasUser?.id || null,
               created_by_name: saasUser?.name || null,
               appointment_id: appointment.id,
@@ -422,11 +459,11 @@ export function CloseAccountModal({ appointment, onClose, onDone }: Props) {
               employee_id: appointment.employee_id || null,
               employee_name: appointment.employee_name || null,
               description: `${appointment.service_name} - ${appointment.client_name}${finalPaymentSplits.length > 1 ? ` (Parte ${i+1}/${finalPaymentSplits.length})` : ''}`,
-              amount: finalPayStatus === "partial" ? split.amount : split.amount, // The amount of this specific split
+              amount: finalPayStatus === "partial" ? split.amount : split.amount,
               paid_amount: split.amount,
-              remaining_amount: i === 0 ? restante : 0, // Only attach the remaining debt to the first entry to avoid multiplying debt
-              discount: i === 0 ? discount : 0, // Only attach discount to first entry
-              original_price: i === 0 ? price : 0, // Only attach original price to first entry
+              remaining_amount: i === 0 ? restante : 0,
+              discount: i === 0 ? discount : 0,
+              original_price: i === 0 ? price : 0,
               type: "income",
               category: "service",
               payment_method: split.method,
@@ -446,6 +483,9 @@ export function CloseAccountModal({ appointment, onClose, onDone }: Props) {
       if (finalPaidCredit > 0) {
         const newCreditTxn = await createDocument("financial_entries", {
           cash_register_id: cashRegisterId,
+          cash_register_date: cashRegisterDate,
+          cash_operator_uid: cashOperatorUid,
+          cash_operator_name: cashOperatorName,
           created_by_user_id: saasUser?.id || null,
           created_by_name: saasUser?.name || null,
           appointment_id: appointment.id,
@@ -730,7 +770,7 @@ export function CloseAccountModal({ appointment, onClose, onDone }: Props) {
     try {
       setLoadingRegister(true)
       await createDocument("cash_registers", {
-        company_id: saasUser?.id || null,
+        company_id: companyId,
         date: toLocalDateStr(),
         opening_amount: parseFloat(openingAmount),
         closing_amount: null,
@@ -739,6 +779,8 @@ export function CloseAccountModal({ appointment, onClose, onDone }: Props) {
         status: "open",
         opened_by_user_id: saasUser?.id || null,
         opened_by_name: saasUser?.name || null,
+        opened_by_uid: currentUid || null,
+        opened_by_email: user?.email || saasUser?.email || null,
         notes: "Aberto via fechamento de pagamento",
         opened_at: new Date().toISOString(),
         closed_at: null,

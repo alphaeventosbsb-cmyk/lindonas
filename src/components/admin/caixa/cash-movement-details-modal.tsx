@@ -245,6 +245,39 @@ export function CashMovementDetailsModal({ entry, onClose, onUpdated }: Props) {
               </div>
             </div>
 
+            {/* Caixa / Operador Info */}
+            {(entry.cash_register_id || entry.cash_operator_name || entry.payment_group_id) && (
+              <div style={{ background: '#f0f4ff', borderRadius: '0.875rem', padding: '1rem', border: '1px solid #c7d2fe' }}>
+                <span style={{ display: 'block', fontSize: '0.6875rem', color: '#4338ca', fontWeight: 700, marginBottom: '0.75rem', textTransform: 'uppercase' }}>Dados do Caixa</span>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                  {entry.cash_operator_name && (
+                    <div>
+                      <span style={{ fontSize: '0.6875rem', color: '#6366f1' }}>Operador do Caixa</span>
+                      <p style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#1e293b' }}>{entry.cash_operator_name}</p>
+                    </div>
+                  )}
+                  {entry.cash_register_id && (
+                    <div>
+                      <span style={{ fontSize: '0.6875rem', color: '#6366f1' }}>Caixa ID</span>
+                      <p style={{ fontSize: '0.6875rem', fontWeight: 500, color: '#475569', fontFamily: 'monospace' }}>{entry.cash_register_id.slice(0, 12)}...</p>
+                    </div>
+                  )}
+                  {entry.payment_group_id && (
+                    <div>
+                      <span style={{ fontSize: '0.6875rem', color: '#6366f1' }}>Grupo de Pagamento</span>
+                      <p style={{ fontSize: '0.6875rem', fontWeight: 500, color: '#475569', fontFamily: 'monospace' }}>{entry.payment_group_id.slice(0, 12)}...</p>
+                    </div>
+                  )}
+                  {entry.employee_name && (
+                    <div>
+                      <span style={{ fontSize: '0.6875rem', color: '#6366f1' }}>Profissional</span>
+                      <p style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#1e293b' }}>{entry.employee_name}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Commissions */}
             {commissions.length > 0 && (
               <div style={{ background: '#fdf4ff', borderRadius: '0.875rem', padding: '1rem', border: '1px solid #fbcfe8' }}>

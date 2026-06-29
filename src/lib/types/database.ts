@@ -430,6 +430,9 @@ export interface FinancialEntry {
   id: string
   company_id: string
   cash_register_id?: string | null
+  cash_register_date?: string | null
+  cash_operator_uid?: string | null
+  cash_operator_name?: string | null
   created_by_user_id?: string | null
   created_by_name?: string | null
   type: "income" | "expense"
@@ -483,6 +486,11 @@ export interface CashRegister {
   company_id: string
   opened_by_user_id?: string | null
   opened_by_name?: string | null
+  opened_by_uid?: string | null
+  opened_by_email?: string | null
+  closed_by_uid?: string | null
+  closed_by_name?: string | null
+  closed_by_email?: string | null
   professional_id?: string | null
   date: string
   opening_amount: number
@@ -491,6 +499,9 @@ export interface CashRegister {
   difference: number | null
   status: "open" | "closed"
   notes: string | null
+  cash_register_name?: string | null
+  is_extra_register?: boolean
+  opening_notes?: string | null
   opened_at: string
   closed_at: string | null
   created_at: string

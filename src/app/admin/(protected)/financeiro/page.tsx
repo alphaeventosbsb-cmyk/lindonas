@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from "react"
 import { fetchCollection, createDocument, deleteDocument } from "@/lib/firebase/client-utils"
 import type { FinancialEntry } from "@/lib/types/database"
 import { formatCurrency, toLocalDateStr } from "@/lib/utils"
-import { Loader2, Plus, Trash2, X, Search, TrendingUp, TrendingDown, DollarSign, ArrowUpCircle, ArrowDownCircle } from "lucide-react"
+import { Loader2, Plus, Trash2, X, Search, TrendingUp, TrendingDown, DollarSign, ArrowUpCircle, ArrowDownCircle, Landmark } from "lucide-react"
 import { toast } from "sonner"
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -15,6 +15,7 @@ import { usePermission } from "@/lib/rbac/usePermission"
 import { PermissionGate } from "@/components/ui/permission-gate"
 import { ExportButtons } from "@/components/ui/export-buttons"
 import { formatCurrencyForExport, formatDateForExport, type ColumnDef } from "@/lib/export-utils"
+import { CashMovementDetailsModal } from "@/components/admin/caixa/cash-movement-details-modal"
 
 const inputStyle: React.CSSProperties = {
   width: '100%', padding: '0.75rem 1rem', borderRadius: '0.75rem',
@@ -25,7 +26,7 @@ const labelStyle: React.CSSProperties = {
   display: 'block', fontSize: '0.875rem', fontWeight: 600, color: '#374151', marginBottom: '0.375rem'
 }
 const paymentLabels: Record<string, string> = {
-  cash: "Dinheiro", pix: "PIX", credit_card: "Crédito", debit_card: "Débito"
+  cash: "Dinheiro", pix: "PIX", credit_card: "Crédito", debit_card: "Débito", transfer: "Transf.", courtesy: "Cortesia", client_credit: "Crédito Cli.", other: "Outro"
 }
 const expenseCategories = ["Aluguel","Água/Luz","Internet","Material","Produtos","Equipamentos","Salários","Marketing","Impostos","Manutenção","Outros"]
 const incomeCategories = ["Serviço","Produto","Pacote","Assinatura","Outros"]
@@ -51,6 +52,7 @@ export default function FinanceiroPage() {
   const canCreate = can("finance.create")
   const canCreateExpense = can("finance.expenses")
   const canDelete = can("finance.delete")
+  const [selectedEntry, setSelectedEntry] = useState<FinancialEntry | null>(null)
 
   const load = async () => {
     setLoading(true)
@@ -305,19 +307,28 @@ export default function FinanceiroPage() {
         {filtered.length > 0 ? (
           <div>
             {filtered.map((entry) => (
-              <div key={entry.id} style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.875rem 1.5rem', borderBottom: '1px solid #f8f9fa', transition: 'background 0.15s' }}>
+              <div key={entry.id} onClick={() => entry.cash_register_id ? setSelectedEntry(entry) : undefined} style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.875rem 1.5rem', borderBottom: '1px solid #f8f9fa', transition: 'background 0.15s', cursor: entry.cash_register_id ? 'pointer' : 'default' }}>
                 <div style={{ width: '2.25rem', height: '2.25rem', borderRadius: '0.625rem', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, background: entry.type === "income" ? '#ecfdf5' : '#fef2f2' }}>
                   {entry.type === "income" ? <ArrowUpCircle style={{ width: '1rem', height: '1rem', color: '#059669' }} /> : <ArrowDownCircle style={{ width: '1rem', height: '1rem', color: '#ef4444' }} />}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <p style={{ fontWeight: 600, color: '#1e1e2d', fontSize: '0.875rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{entry.description || "Sem descrição"}</p>
-                  <p style={{ fontSize: '0.75rem', color: '#9ca3af' }}>{entry.category || "Sem categoria"} • {paymentLabels[entry.payment_method] || entry.payment_method || "N/A"} • {(entry.date || "").split("-").reverse().join("/")}</p>
+                  <p style={{ fontSize: '0.75rem', color: '#9ca3af' }}>
+                    {entry.category || "Sem categoria"} • {paymentLabels[entry.payment_method] || entry.payment_method || "N/A"} • {(entry.date || "").split("-").reverse().join("/")}
+                    {entry.client_name ? ` • ${entry.client_name}` : ""}
+                    {entry.employee_name ? ` • ${entry.employee_name}` : ""}
+                  </p>
+                  {entry.cash_operator_name && (
+                    <p style={{ fontSize: '0.625rem', color: '#7c5cfc', fontWeight: 600, marginTop: '0.125rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                      <Landmark style={{ width: '0.5rem', height: '0.5rem' }} /> Caixa: {entry.cash_operator_name}
+                    </p>
+                  )}
                 </div>
                 <p style={{ fontWeight: 800, fontSize: '0.9375rem', color: entry.type === "income" ? '#059669' : '#ef4444', whiteSpace: 'nowrap' }}>
-                  {entry.type === "income" ? "+" : "-"}{formatCurrency(entry.amount)}
+                  {entry.type === "income" ? "+" : "-"}{formatCurrency(entry.paid_amount || entry.amount)}
                 </p>
                 <PermissionGate permission="finance.delete">
-                  <button onClick={() => handleDelete(entry.id, entry.description)} style={{ padding: '0.375rem', borderRadius: '0.375rem', border: 'none', background: 'transparent', cursor: 'pointer', flexShrink: 0 }}>
+                  <button onClick={(e) => { e.stopPropagation(); handleDelete(entry.id, entry.description) }} style={{ padding: '0.375rem', borderRadius: '0.375rem', border: 'none', background: 'transparent', cursor: 'pointer', flexShrink: 0 }}>
                     <Trash2 style={{ width: '0.875rem', height: '0.875rem', color: '#d1d5db' }} />
                   </button>
                 </PermissionGate>
@@ -332,6 +343,13 @@ export default function FinanceiroPage() {
         )}
       </div>
       <ConfirmationDialog />
+      {selectedEntry && (
+        <CashMovementDetailsModal
+          entry={selectedEntry}
+          onClose={() => setSelectedEntry(null)}
+          onUpdated={() => { load(); setSelectedEntry(null) }}
+        />
+      )}
     </div>
   )
 }

@@ -137,6 +137,8 @@ export const RBAC_MODULES: RBACModule[] = [
       { key: "cash.export", label: "Exportar caixa", description: "Download de fechamentos e transações" },
       { key: "cash.print", label: "Imprimir resumo", description: "Imprimir fechamento" },
       { key: "cash.refund", label: "Estornar pagamento", description: "Estornar conta fechada" },
+      { key: "cash.manage", label: "Gerenciar caixas", description: "Abrir caixa extra e operar caixas de outros operadores" },
+      { key: "cash.view_all", label: "Ver todos os caixas", description: "Visualizar caixas de todos os operadores" },
     ],
   },
   {
@@ -277,7 +279,8 @@ const profissionalIIKeys = [
 
 const gerenteKeys = allKeys.filter(k =>
   k !== "rbac.manage" && k !== "rbac.profiles.manage" && k !== "rbac.audit.view" &&
-  k !== "professionals.permissions.manage" && k !== "professionals.delete"
+  k !== "professionals.permissions.manage" && k !== "professionals.delete" &&
+  k !== "cash.manage" && k !== "cash.view_all"
 )
 
 const estoquistaKeys = [

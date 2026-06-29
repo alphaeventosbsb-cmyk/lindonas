@@ -208,7 +208,7 @@ export function ClientFormModal({ client, onClose, onSave }: Props) {
       const oldUrl = (photoFile || !photoUrl) ? (client?.photo_url ?? null) : null
       await onSave(data, photoFile, oldUrl)
     } catch {
-      toast.error("Erro ao salvar cliente")
+      // Error toast is already shown by the parent (onSave handler)
     }
     setSaving(false)
   }

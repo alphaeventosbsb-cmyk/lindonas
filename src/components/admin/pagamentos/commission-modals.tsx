@@ -131,6 +131,7 @@ function ServicesModalContent({ commissions, start, end, onRefresh, employeeName
 }
 
 function EditCommissionModal({ commission, employeeName, onClose, onRefresh }: { commission: Commission, employeeName: string, onClose: () => void, onRefresh: () => void }) {
+  const { saasUser, user, isSuperAdmin, isOwner } = useTenant()
   const isPaid = commission.status === "paid"
   const calculatedAmount = commission.commission_calculated_amount ?? commission.commission_amount
   
@@ -144,8 +145,73 @@ function EditCommissionModal({ commission, employeeName, onClose, onRefresh }: {
   const [isSaving, setIsSaving] = useState(false)
   const [showConfirmOver, setShowConfirmOver] = useState(false)
 
+  // Professional swap state
+  const [employees, setEmployees] = useState<Employee[]>([])
+  const [selectedProfId, setSelectedProfId] = useState(commission.professional_id)
+  const [selectedProfName, setSelectedProfName] = useState(commission.professional_name_snapshot || employeeName)
+  const [selectedProfPercent, setSelectedProfPercent] = useState(commission.commission_percentage)
+  const [showProfSelector, setShowProfSelector] = useState(false)
+  const [profSearch, setProfSearch] = useState("")
+  const [showRecalcConfirm, setShowRecalcConfirm] = useState(false)
+  const [pendingProf, setPendingProf] = useState<Employee | null>(null)
+  const [wasManuallyEdited, setWasManuallyEdited] = useState(
+    commission.commission_adjusted_amount !== undefined && 
+    commission.commission_adjusted_amount !== calculatedAmount
+  )
+
+  const currentCalculatedAmount = commission.paid_amount * (selectedProfPercent / 100)
+
+  useEffect(() => {
+    if (saasUser?.id) {
+      fetchCollectionWhere<Employee>("employees", "company_id", "==", saasUser.id)
+        .then(emps => setEmployees(emps.filter(e => e.is_active !== false)))
+        .catch(() => {})
+    }
+  }, [saasUser?.id])
+
+  const filteredEmployees = employees.filter(e => 
+    e.name.toLowerCase().includes(profSearch.toLowerCase()) && e.id !== selectedProfId
+  )
+
+  const handleSelectProfessional = (emp: Employee) => {
+    const newPercent = emp.commission_percent || 0
+    const newCalc = commission.paid_amount * (newPercent / 100)
+    const currentVal = parseFloat(adjustedAmount)
+    const hadManualEdit = wasManuallyEdited || (currentVal !== calculatedAmount && currentVal !== currentCalculatedAmount)
+
+    if (hadManualEdit) {
+      setPendingProf(emp)
+      setShowRecalcConfirm(true)
+    } else {
+      applyProfessionalSwap(emp, true)
+    }
+    setShowProfSelector(false)
+    setProfSearch("")
+  }
+
+  const applyProfessionalSwap = (emp: Employee, recalculate: boolean) => {
+    const newPercent = emp.commission_percent || 0
+    const newCalc = commission.paid_amount * (newPercent / 100)
+    
+    setSelectedProfId(emp.id)
+    setSelectedProfName(emp.name)
+    setSelectedProfPercent(newPercent)
+    
+    if (recalculate) {
+      setAdjustedAmount(String(newCalc.toFixed(2)))
+      setWasManuallyEdited(false)
+    }
+    setPendingProf(null)
+    setShowRecalcConfirm(false)
+  }
+
+  const handleAmountChange = (val: string) => {
+    setAdjustedAmount(val)
+    setWasManuallyEdited(true)
+  }
+
   const handleSave = () => {
-    if (isPaid) return
+    if (isPaid && !(isSuperAdmin || isOwner)) return
     const val = parseFloat(adjustedAmount)
     if (isNaN(val) || val < 0) return toast.error("Valor inválido")
     if (val > commission.paid_amount) {
@@ -159,16 +225,49 @@ function EditCommissionModal({ commission, employeeName, onClose, onRefresh }: {
     setIsSaving(true)
     setShowConfirmOver(false)
     try {
-      await updateDocument("commissions", commission.id, {
-        commission_calculated_amount: calculatedAmount,
+      const professionalChanged = selectedProfId !== commission.professional_id
+      const oldProfName = commission.professional_name_snapshot || employeeName
+      const currentUid = user?.uid || saasUser?.firebase_uid || ""
+
+      const updateData: Record<string, any> = {
+        commission_calculated_amount: currentCalculatedAmount,
         commission_adjusted_amount: val,
         commission_final_amount: val,
-        commission_amount: val, // Keep backward compatibility for aggregations
+        commission_amount: val,
         commission_adjustment_reason: reason,
         commission_adjusted_at: new Date().toISOString(),
         commission_release_date: releaseDate,
-      })
-      toast.success("Rateio ajustado com sucesso")
+        commission_adjusted_by_user_id: currentUid || null,
+        updated_at: new Date().toISOString(),
+      }
+
+      if (professionalChanged) {
+        updateData.professional_id = selectedProfId
+        updateData.professional_name_snapshot = selectedProfName
+        updateData.commission_percentage = selectedProfPercent
+      }
+
+      await updateDocument("commissions", commission.id, updateData)
+
+      // Audit log
+      if (professionalChanged) {
+        const { createHistoryEvent } = await import("@/lib/firebase/history-service")
+        await createHistoryEvent({
+          appointment_id: commission.appointment_id || null,
+          client_id: commission.client_id || null,
+          client_name: commission.client_name_snapshot || null,
+          action_type: "commission_professional_swap",
+          action_title: "Profissional da comissão alterado",
+          action_description: `Rateio alterado: profissional trocado de ${oldProfName} para ${selectedProfName}. Valor anterior: R$ ${calculatedAmount.toFixed(2)}. Novo valor: R$ ${val.toFixed(2)}. Comissão base: ${selectedProfPercent}%.`,
+          old_value: oldProfName,
+          new_value: selectedProfName,
+          performed_by_user_id: currentUid || "system",
+          performed_by_name: saasUser?.name || "Sistema",
+          performed_by_email: user?.email || saasUser?.email || null,
+        }).catch(() => {})
+      }
+
+      toast.success(professionalChanged ? "Profissional e rateio atualizados!" : "Rateio ajustado com sucesso")
       onRefresh()
       onClose()
     } catch (err) {
@@ -185,9 +284,9 @@ function EditCommissionModal({ commission, employeeName, onClose, onRefresh }: {
       <div style={{
         position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
         zIndex: 10002, background: '#fff', borderRadius: '1rem', width: '100%', maxWidth: '500px',
-        boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)', overflow: 'hidden'
+        boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)', overflow: 'hidden', maxHeight: '92vh', display: 'flex', flexDirection: 'column'
       }}>
-        <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fafbfc' }}>
+        <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fafbfc', flexShrink: 0 }}>
           <h3 style={{ fontSize: '1.125rem', fontWeight: 800, color: '#1e1e2d', fontFamily: "var(--font-heading)" }}>
             Editar Rateio
           </h3>
@@ -196,47 +295,118 @@ function EditCommissionModal({ commission, employeeName, onClose, onRefresh }: {
           </button>
         </div>
 
-        <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', overflowY: 'auto', flex: 1 }}>
           {isPaid && (
             <div style={{ padding: '0.75rem', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '0.5rem', color: '#ef4444', fontSize: '0.8125rem', fontWeight: 600, display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-              <AlertTriangle style={{ width: '1rem', height: '1rem' }} />
-              Esta comissão já foi paga e não pode ser alterada.
+              <AlertTriangle style={{ width: '1rem', height: '1rem', flexShrink: 0 }} />
+              {(isSuperAdmin || isOwner) 
+                ? "Esta comissão já foi marcada como paga. Alterar o profissional pode exigir ajuste financeiro."
+                : "Esta comissão já foi paga e não pode ser alterada."
+              }
             </div>
           )}
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', fontSize: '0.8125rem' }}>
-            <div><strong style={{ color: '#64748b' }}>Profissional:</strong> <span style={{ color: '#1e1e2d', fontWeight: 600 }}>{employeeName}</span></div>
+            {/* Professional — swappable */}
+            <div style={{ gridColumn: '1 / -1', position: 'relative' }}>
+              <strong style={{ color: '#64748b' }}>Profissional:</strong>{' '}
+              <span style={{ color: '#1e1e2d', fontWeight: 600 }}>{selectedProfName}</span>
+              {(!isPaid || isSuperAdmin || isOwner) && (
+                <button 
+                  onClick={() => setShowProfSelector(!showProfSelector)}
+                  style={{ marginLeft: '0.5rem', padding: '0.2rem 0.5rem', borderRadius: '0.375rem', border: '1px solid #c7d2fe', background: '#f0f4ff', color: '#4338ca', fontSize: '0.6875rem', fontWeight: 700, cursor: 'pointer', verticalAlign: 'middle' }}
+                >
+                  Trocar
+                </button>
+              )}
+
+              {/* Professional selector dropdown */}
+              {showProfSelector && (
+                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10, background: '#fff', border: '2px solid #c7d2fe', borderRadius: '0.75rem', boxShadow: '0 12px 36px rgba(0,0,0,0.15)', marginTop: '0.375rem', maxHeight: '250px', display: 'flex', flexDirection: 'column' }}>
+                  <div style={{ padding: '0.5rem', borderBottom: '1px solid #e5e7eb', flexShrink: 0 }}>
+                    <input
+                      type="text"
+                      value={profSearch}
+                      onChange={e => setProfSearch(e.target.value)}
+                      placeholder="Buscar profissional..."
+                      autoFocus
+                      style={{ width: '100%', padding: '0.5rem 0.75rem', borderRadius: '0.5rem', border: '1px solid #e2e8f0', fontSize: '0.8125rem', outline: 'none' }}
+                    />
+                  </div>
+                  <div style={{ overflowY: 'auto', flex: 1 }}>
+                    {filteredEmployees.length > 0 ? filteredEmployees.map(emp => (
+                      <button
+                        key={emp.id}
+                        onClick={() => handleSelectProfessional(emp)}
+                        style={{ width: '100%', padding: '0.625rem 0.75rem', border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: '0.8125rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f8fafc', transition: 'background 0.1s' }}
+                        onMouseEnter={e => e.currentTarget.style.background = '#f0f4ff'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                      >
+                        <span style={{ fontWeight: 600, color: '#1e1e2d' }}>{emp.name}</span>
+                        <span style={{ fontSize: '0.6875rem', color: '#7c5cfc', fontWeight: 700 }}>{emp.commission_percent || 0}%</span>
+                      </button>
+                    )) : (
+                      <div style={{ padding: '1rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.8125rem' }}>
+                        Nenhum profissional encontrado
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ padding: '0.375rem', borderTop: '1px solid #e5e7eb', flexShrink: 0 }}>
+                    <button onClick={() => { setShowProfSelector(false); setProfSearch("") }} style={{ width: '100%', padding: '0.375rem', borderRadius: '0.375rem', border: 'none', background: '#f1f5f9', color: '#64748b', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}>
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
             <div><strong style={{ color: '#64748b' }}>Cliente:</strong> <span style={{ color: '#1e1e2d', fontWeight: 600 }}>{commission.client_name_snapshot}</span></div>
             <div style={{ gridColumn: '1 / -1' }}><strong style={{ color: '#64748b' }}>Serviço:</strong> <span style={{ color: '#1e1e2d', fontWeight: 600 }}>{commission.service_name_snapshot}</span></div>
             <div><strong style={{ color: '#64748b' }}>Preço original:</strong> <span style={{ color: '#1e1e2d', fontWeight: 600 }}>{formatCurrency(commission.service_amount)}</span></div>
             <div><strong style={{ color: '#64748b' }}>Valor pago:</strong> <span style={{ color: '#1e1e2d', fontWeight: 600 }}>{formatCurrency(commission.paid_amount)}</span></div>
             <div><strong style={{ color: '#64748b' }}>Data Original:</strong> <span style={{ color: '#1e1e2d', fontWeight: 600 }}>{commission.performed_at.split('-').reverse().join('/')}</span></div>
-            <div><strong style={{ color: '#64748b' }}>Comissão base:</strong> <span style={{ color: '#1e1e2d', fontWeight: 600 }}>{commission.commission_percentage}%</span></div>
+            <div><strong style={{ color: '#64748b' }}>Comissão base:</strong> <span style={{ color: '#1e1e2d', fontWeight: 600 }}>{selectedProfPercent}%</span></div>
           </div>
+
+          {/* Recalculate confirmation */}
+          {showRecalcConfirm && pendingProf && (
+            <div style={{ padding: '1rem', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '0.5rem' }}>
+              <p style={{ fontSize: '0.8125rem', color: '#92400e', fontWeight: 600, marginBottom: '0.5rem' }}>
+                O valor do rateio foi editado manualmente. Deseja recalcular com base no novo profissional ({pendingProf.name} — {pendingProf.commission_percent || 0}%)?
+              </p>
+              <p style={{ fontSize: '0.75rem', color: '#a16207', marginBottom: '0.75rem' }}>
+                Novo rateio calculado: {formatCurrency(commission.paid_amount * ((pendingProf.commission_percent || 0) / 100))}
+              </p>
+              <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                <button onClick={() => applyProfessionalSwap(pendingProf, false)} style={{ padding: '0.375rem 0.75rem', borderRadius: '0.375rem', border: '1px solid #d1d5db', background: '#fff', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}>Manter valor atual</button>
+                <button onClick={() => applyProfessionalSwap(pendingProf, true)} style={{ padding: '0.375rem 0.75rem', borderRadius: '0.375rem', border: 'none', background: '#7c5cfc', color: '#fff', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}>Recalcular</button>
+              </div>
+            </div>
+          )}
 
           <div style={{ height: '1px', background: '#f1f5f9', margin: '0.5rem 0' }} />
 
           <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', alignItems: 'center', gap: '0.5rem' }}>
             <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#64748b', textAlign: 'right' }}>Rateio Calculado:</span>
-            <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#1e1e2d' }}>{formatCurrency(calculatedAmount)}</span>
+            <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#1e1e2d' }}>{formatCurrency(currentCalculatedAmount)}</span>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', alignItems: 'center', gap: '0.5rem' }}>
             <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#1e1e2d', textAlign: 'right' }}>Rateio a Pagar:</span>
             <div style={{ position: 'relative' }}>
               <span style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', fontSize: '0.875rem', color: '#64748b', fontWeight: 600 }}>R$</span>
-              <input type="number" step="0.01" min="0" value={adjustedAmount} onChange={e => setAdjustedAmount(e.target.value)} disabled={isPaid} style={{ width: '100%', padding: '0.625rem 0.875rem', borderRadius: '0.625rem', border: '2px solid #e8ecf4', fontSize: '0.8125rem', outline: 'none', background: '#fff', paddingLeft: '2rem', fontWeight: 700, color: '#7c5cfc' }} />
+              <input type="number" step="0.01" min="0" value={adjustedAmount} onChange={e => handleAmountChange(e.target.value)} disabled={isPaid && !(isSuperAdmin || isOwner)} style={{ width: '100%', padding: '0.625rem 0.875rem', borderRadius: '0.625rem', border: '2px solid #e8ecf4', fontSize: '0.8125rem', outline: 'none', background: '#fff', paddingLeft: '2rem', fontWeight: 700, color: '#7c5cfc' }} />
             </div>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', alignItems: 'center', gap: '0.5rem' }}>
             <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#1e1e2d', textAlign: 'right' }}>Data da Liberação:</span>
-            <input type="date" value={releaseDate} onChange={e => setReleaseDate(e.target.value)} disabled={isPaid} style={{ width: '100%', padding: '0.625rem 0.875rem', borderRadius: '0.625rem', border: '2px solid #e8ecf4', fontSize: '0.8125rem', color: '#1e1e2d', outline: 'none', background: '#fff' }} />
+            <input type="date" value={releaseDate} onChange={e => setReleaseDate(e.target.value)} disabled={isPaid && !(isSuperAdmin || isOwner)} style={{ width: '100%', padding: '0.625rem 0.875rem', borderRadius: '0.625rem', border: '2px solid #e8ecf4', fontSize: '0.8125rem', color: '#1e1e2d', outline: 'none', background: '#fff' }} />
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', alignItems: 'flex-start', gap: '0.5rem' }}>
             <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#1e1e2d', textAlign: 'right', marginTop: '0.5rem' }}>Observação:</span>
-            <textarea value={reason} onChange={e => setReason(e.target.value)} disabled={isPaid} rows={2} style={{ width: '100%', padding: '0.625rem 0.875rem', borderRadius: '0.625rem', border: '2px solid #e8ecf4', fontSize: '0.8125rem', color: '#1e1e2d', outline: 'none', background: '#fff', resize: 'none' }} placeholder="Ex: Ajustado por causa de retrabalho" />
+            <textarea value={reason} onChange={e => setReason(e.target.value)} disabled={isPaid && !(isSuperAdmin || isOwner)} rows={2} style={{ width: '100%', padding: '0.625rem 0.875rem', borderRadius: '0.625rem', border: '2px solid #e8ecf4', fontSize: '0.8125rem', color: '#1e1e2d', outline: 'none', background: '#fff', resize: 'none' as const }} placeholder="Ex: Ajustado por causa de retrabalho" />
           </div>
 
           {showConfirmOver && (
@@ -253,7 +423,7 @@ function EditCommissionModal({ commission, employeeName, onClose, onRefresh }: {
             <button onClick={onClose} style={{ padding: '0.625rem 1.25rem', borderRadius: '0.625rem', border: '1px solid #e2e8f0', background: '#fff', fontSize: '0.8125rem', fontWeight: 600, cursor: 'pointer' }}>
               Cancelar
             </button>
-            <button onClick={handleSave} disabled={isPaid || isSaving} style={{ padding: '0.625rem 1.25rem', borderRadius: '0.625rem', border: 'none', background: (isPaid || isSaving) ? '#cbd5e1' : '#7c5cfc', color: '#fff', fontSize: '0.8125rem', fontWeight: 700, cursor: (isPaid || isSaving) ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <button onClick={handleSave} disabled={(isPaid && !(isSuperAdmin || isOwner)) || isSaving} style={{ padding: '0.625rem 1.25rem', borderRadius: '0.625rem', border: 'none', background: ((isPaid && !(isSuperAdmin || isOwner)) || isSaving) ? '#cbd5e1' : '#7c5cfc', color: '#fff', fontSize: '0.8125rem', fontWeight: 700, cursor: ((isPaid && !(isSuperAdmin || isOwner)) || isSaving) ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
               {isSaving ? 'Salvando...' : 'Salvar Rateio'}
             </button>

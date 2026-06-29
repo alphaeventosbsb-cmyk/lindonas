@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from "react"
 import { X, CheckCircle, Loader2, Banknote, Calendar, CreditCard, DollarSign, Wallet, AlertTriangle } from "lucide-react"
 import type { Employee, Commission, CashRegister } from "@/lib/types/database"
 import { formatCurrency, toLocalDateStr } from "@/lib/utils"
-import { fetchCollectionWhere, fetchCollectionWithQueries, updateDocument, createDocument } from "@/lib/firebase/client-utils"
+import { fetchCollection, fetchCollectionWhere, fetchCollectionWithQueries, updateDocument, createDocument } from "@/lib/firebase/client-utils"
 import { toast } from "sonner"
 import { useTenant } from "@/lib/auth/tenant-context"
 
@@ -162,12 +162,10 @@ function EditCommissionModal({ commission, employeeName, onClose, onRefresh }: {
   const currentCalculatedAmount = commission.paid_amount * (selectedProfPercent / 100)
 
   useEffect(() => {
-    if (saasUser?.id) {
-      fetchCollectionWhere<Employee>("employees", "company_id", "==", saasUser.id)
-        .then(emps => setEmployees(emps.filter(e => e.is_active !== false)))
-        .catch(() => {})
-    }
-  }, [saasUser?.id])
+    fetchCollection<Employee>("employees")
+      .then(emps => setEmployees(emps.filter(e => e.is_active !== false)))
+      .catch(() => {})
+  }, [])
 
   const filteredEmployees = employees.filter(e => 
     e.name.toLowerCase().includes(profSearch.toLowerCase()) && e.id !== selectedProfId

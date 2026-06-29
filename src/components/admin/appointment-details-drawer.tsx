@@ -1010,7 +1010,7 @@ export function AppointmentDetailsDrawer({ appointment, employees, labels, onClo
                 Excluir Agendamento?
               </h3>
               <p style={{ fontSize: '0.8125rem', color: '#6b7280', lineHeight: 1.5, marginBottom: '1.25rem' }}>
-                Esta ação é <strong style={{ color: '#ef4444' }}>irreversível</strong>. O agendamento será permanentemente removido do sistema.
+                Esta ação é <strong style={{ color: '#ef4444' }}>irreversível</strong>. O agendamento será permanentemente removido do sistema e as comissões pendentes vinculadas a este agendamento também serão canceladas, pois o serviço não será considerado realizado.
               </p>
 
               {/* Appointment summary */}
